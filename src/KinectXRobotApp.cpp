@@ -4,6 +4,8 @@
 #include "cinder/CinderImGui.h"
 
 #include <Windows.h>
+#include <iostream>
+#include <string>
 #include "NuiApi.h"
 #include "robot_manipulator.h"
 
@@ -122,12 +124,16 @@ void KinectXRobotApp::update()
 	ImGui::DragFloat3("Right look at", &right_look_at, 0.01f);
 	ImGui::Separator();
 	ImGui::Checkbox("Seated Tracking", &seated_tracking);
+	
+	if(ImGui::Button("View orthogonal z=0")) right_eye_point = vec3(1.5f, 15.0f, 0.0f);
+	if (ImGui::Button("View orthogonal y=0")) right_eye_point = vec3(1.5f, 0.0f, 11.7f);
 	if (ImGui::Button("Reset Defaults")) set_cam_def();
 	ImGui::End();
 
-	ImGui::Begin("Robot controls");
-	//ImGui::ShowDemoWindow();
-	ImGui::End();
+
+	//display info panel
+	r1.display_info();
+	
 
 	//update camera parameters
 	left_cam.setEyePoint(left_eye_point);
@@ -147,6 +153,8 @@ void KinectXRobotApp::update()
 		update_skeletonFrame();
 		get_joint_coordinate();
 	}
+
+	
 }
 
 void KinectXRobotApp::draw()
@@ -162,7 +170,7 @@ void KinectXRobotApp::draw()
 
 
 	r1.draw();
-
+	
 
 
 	//left side of screen
@@ -187,15 +195,15 @@ void KinectXRobotApp::draw()
 	left_cam_farplane.draw();
 
 	//draw skeleton
-	draw_skeleton();
+	//draw_skeleton();
 }
 
 void KinectXRobotApp::set_cam_def(){
 	left_eye_point = vec3(0.0f, 0.0f, -300.0f);
 	left_look_at = vec3(0.0f);
 
-	right_eye_point = vec3(-3.3f, 6.0f, 11.0f);
-	right_look_at = vec3(0.0f, 1.5f, 0.0f);
+	right_eye_point = vec3(1.5f, 0.0f, 11.7f);
+	right_look_at = vec3(1.5f, 1.5f, 0.0f);
 }
 
 

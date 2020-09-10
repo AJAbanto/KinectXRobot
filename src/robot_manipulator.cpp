@@ -1,25 +1,32 @@
 #include "robot_manipulator.h"
-
+#define deg_to_rad(deg) (((deg) * M_PI)/ 180.0f)
+#define rad_to_deg(rad) (((rad) * 180.0f) / M_PI)
 
 robot_manipulator::robot_manipulator() {
     //initialize model parameters
     base_pos = vec3(0, 0, 0);
 
-    float def_len = 1.0f;
+    //forward kinematics testing stuff
+    forward = vec4(0, 45, 45, 90);
+    test_forward = true;
+
+    float def_len = 1.5f;
     float def_jsz = 0.30f;
     float def_lsz = 0.25f;
     float def_base_sz = 1.5f;
     this->l1_len = def_len;
     this->l2_len = def_len;
-    this->l3_len = def_len/2;
+    this->l3_len = def_len;
     this->joint_sz = def_jsz;
     this->link_sz = def_lsz;
     this->base_sz = def_base_sz;
 
+    this->tot_len = l1_len + l2_len + l3_len + 2 * joint_sz + joint_sz/2;
+
     //note that all angles are in degrees
-    this->alpha = 45;
-    this->beta = 45;
-    this->theta = 45;
+    this->alpha = 0;
+    this->beta = 0;
+    this->theta = 0;
     this->theta_0 = 0;
     this->gamma = this->alpha + this->beta + this->theta;
 
@@ -82,18 +89,79 @@ void robot_manipulator::init(vec3 base_pos, float limb_lens[3], float joint_sz ,
 
 vec3 robot_manipulator::get_base_pos()
 {
-    return this->base_pos;
+    return base_pos;
 }
 
 
 vec4 robot_manipulator::get_end_pos()
 {
-    return vec4(this->end_pos,gamma);
+    return vec4(end_pos,gamma);
+}
+
+vec4 robot_manipulator::get_angles()
+{
+    return vec4(alpha , beta , theta, theta_0);
+}
+
+void robot_manipulator::display_info()
+{
+
+    string alpha_str = "Alpha:   " + std::to_string(alpha);
+    string beta_str = "Beta:    " + std::to_string(beta);
+    string theta_str = "Theta:   " + std::to_string(theta);
+    string theta_0_str = "Theta_0: " + std::to_string(theta_0);
+    string end_pos_str = "Input: (" + std::to_string(end_pos.x) + " , " + std::to_string(end_pos.y) + " , "
+        + std::to_string(end_pos.z) + " ) "
+        + "gamma : " + std::to_string(gamma);
+
+    ImGui::Begin("Robot info");
+
+    /*
+    ImGui::DragFloat("Link 1" ,&l1_len,0.1f);
+    ImGui::DragFloat("Link 2", &l2_len, 0.1f);
+    ImGui::DragFloat("Link 3", &l3_len, 0.1f);
+    */
+    ImGui::Text(alpha_str.c_str());
+    ImGui::Text(beta_str.c_str());
+    ImGui::Text(theta_str.c_str());
+    ImGui::Text(theta_0_str.c_str());
+    ImGui::Text(end_pos_str.c_str());
+    
+    ImGui::Checkbox("Test forward kinematics", &test_forward);
+
+    if(test_forward) ImGui::DragFloat4("Input angles: ", &forward, 1.0f);
+    if(ImGui::Button("Reset angle vector")) forward = vec4(0, 45, 45, 90);
+    ImGui::End();
+
 }
 
 void robot_manipulator::draw()
 {
+
+    //set destination point and draw sphere there
+    vec3 dest = vec3(tot_len, base_sz/2, 0);    // should full extend towards the x-axis
+    gl::color(0, 0.5f, 0.5f);
+    gl::drawSphere(dest, 0.5f);
     
+    // Test inverse kinematics
+    vec4 angles = calcIK(vec4(1.5, 0.0f, 0.0f , 0.0f));
+
+    alpha = angles.x;
+    beta = angles.y;
+    theta = angles.z;
+    theta_0 = angles.w;
+    
+    //check if we're testing forward kinematics
+    if (test_forward) {
+        alpha = forward.x;
+        beta = forward.y;
+        theta = forward.z;
+        theta_0 = forward.w;
+    }
+    
+
+    
+
     //some unit vectors for referrence
     gl::color(Color(1, 0, 0));
     gl::drawVector(vec3(-3, 0, 0), vec3(-2, 0, 0));
@@ -104,46 +172,46 @@ void robot_manipulator::draw()
     gl::color(Color(1, 1, 1));
 
     //translate to base render position
-    gl::translate(this->base_pos);
+    gl::translate(base_pos);
     
-    this->model[0]->draw();                             //base cube
+    model[0]->draw();                             //base cube
     gl::translate(vec3(0, base_sz/2, 0));
     
     //rotate base by theta_0 
-    gl::rotate(( (-this->theta_0 - 90.0f) * M_PI) / 180.0f, vec3(0, 1, 0));
+    gl::rotate(deg_to_rad(theta_0 - 90.0), vec3(0, 1, 0));
 
 
     //draw first joint accounting for alpha (rotate abt the z axis)
-    gl::rotate(( ( this->alpha - 90.0f) * M_PI) / 180.0f, vec3(0, 0, 1));
+    gl::rotate( deg_to_rad(alpha - 90.0), vec3(0, 0, 1));
     gl::translate(vec3(0, joint_sz / 2, 0));
 
-    this->model[1]->draw();
+    model[1]->draw();
     gl::drawCoordinateFrame();      //draw some unit vectors for referrence
 
     //draw first link
     gl::translate(vec3(0, joint_sz / 2, 0));
-    this->model[2]->draw();
+    model[2]->draw();
 
     
     //draw second joint accounting for beta (rotate abt the z axis)
-    gl::translate(vec3(0, this->l1_len + (this->joint_sz / 2), 0));
-    gl::rotate(( -this->beta * M_PI) / 180.0f, vec3(0, 0, 1));
-    this->model[1]->draw();
+    gl::translate(vec3(0, l1_len + (joint_sz / 2), 0));
+    gl::rotate(deg_to_rad(beta), vec3(0, 0, 1));
+    model[1]->draw();
     gl::drawCoordinateFrame();      //draw some unit vectors for referrence
 
     //draw second link
     gl::translate(vec3(0, joint_sz / 2, 0));
-    this->model[3]->draw();
+    model[3]->draw();
 
     //draw third joint accounting for beta (rotate abt the z axis)
-    gl::translate(vec3(0, this->l2_len + (this->joint_sz / 2), 0));
-    gl::rotate((this->theta * M_PI) / 180.0f, vec3(0, 0, 1));
-    this->model[1]->draw();
+    gl::translate(vec3(0, l2_len + (joint_sz / 2), 0));
+    gl::rotate(deg_to_rad(theta), vec3(0, 0, 1));
+    model[1]->draw();
     gl::drawCoordinateFrame();      //draw some unit vectors for referrence
 
     //draw third link
     gl::translate(vec3(0, joint_sz / 2, 0));
-    this->model[4]->draw();
+    model[4]->draw();
 
     
 
@@ -153,22 +221,25 @@ void robot_manipulator::draw()
 vec4 robot_manipulator::calcIK(vec4 dest)
 {
     //dest is (x,y,z,gamma)
+    //Note: needed to convert all parameters to radians
 
     //getting needed parameters to calculate angles
-    float L1_sqrd = this->l1_len * this->l1_len;
-    float L2_sqrd = this->l2_len * this->l2_len;
-    float x0 = dest.x - (this->l3_len * cos(dest.w));
-    float y0 = dest.y - (this->l3_len * cos(dest.w));
+    float L1_sqrd = l1_len * l1_len;
+    float L2_sqrd = l2_len * l2_len;
+    float x0 = dest.x - ( l3_len * cos ( deg_to_rad(dest.w) ));
+    float y0 = dest.y - ( l3_len * sin ( deg_to_rad(dest.w) ) );
     float r0_sqrd = (x0 * x0) + (y0 * y0);
     float r0 = sqrt(r0_sqrd);
     float rz = sqrt((dest.x * dest.x) + (dest.y * dest.y));
 
-    //calculating actual angles
-    float alpha = 180 - acos((L1_sqrd + L2_sqrd - r0_sqrd)/(2 * this->l1_len * this->l2_len));
-    float beta = atan(y0/x0) + acos((r0_sqrd + L1_sqrd - L2_sqrd)/(2 * r0 * this->l1_len));
-    float theta = dest.w - alpha - beta;
-    float theta_0 = acos(dest.z / rz);
+    //calculating actual angles in degrees
+    float b = 180 - acos( deg_to_rad((L1_sqrd + L2_sqrd - r0_sqrd)/(2 * l1_len * l2_len)) );
+    float a = atan(deg_to_rad(y0/x0)) + acos( deg_to_rad(  (r0_sqrd + L1_sqrd - L2_sqrd) / (2 * r0 * l1_len) ) );
+    float t = dest.w - a - b;
+    float t0 = acos(deg_to_rad(dest.z / rz));
     
-    //note return -beta
-    return vec4(alpha,-beta,theta,theta_0);
+    //temporarily update end point
+    end_pos = dest;
+
+    return vec4(a,-b,t,t0);
 }

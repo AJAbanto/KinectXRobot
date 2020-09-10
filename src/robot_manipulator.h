@@ -2,11 +2,14 @@
 
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/gl.h"
+#include "cinder/CinderImGui.h"
+#include <string.h>
 #include <math.h>
 
 
 using namespace ci;
 using namespace ci::app;
+using namespace std;
 
 class robot_manipulator
 {
@@ -17,6 +20,9 @@ class robot_manipulator
 		
 		vec3 get_base_pos();// returns (x , y , z)
 		vec4 get_end_pos(); // returns (x , y , z , gamma)
+		vec4 get_angles();  // returns (a , b , th ,th0)
+
+		void display_info();	  //display robot controls
 		void set_dest(vec4 dest); // accepts (x , y , z , gamma)
 		
 		void draw();
@@ -31,6 +37,9 @@ class robot_manipulator
 
 		float joint_sz;		//joint sphere radius
 
+		float tot_len;		//total length of robot arm
+
+		//all angles are in degrees
 		float alpha;		//angle at the shoulder
 		float beta;			//angle at the elbow
 		float theta;		//angle at the wrist
@@ -41,12 +50,15 @@ class robot_manipulator
 		vec3 end_pos;		//current end effector position (x,y,z)
 		vec4 dest_pos;      //destination of end effector	(x,y,z,gamma)
 
-		//testing shaders and shit
-		gl::BatchRef model[5];
+
+		bool test_forward;	//for testing inverse kinematics
+		vec4 forward;		//forward kinematics vector  
+		
+		gl::BatchRef model[5];	//shaders and model container
 		gl::GlslProgRef shader;
 		
 
-		vec4 calcIK(vec4 dest);	//calculate Inverse kinematics returns (alpha,beta,theta,thata0)
+		vec4 calcIK(vec4 dest);	//calculate Inverse kinematics returns (alpha,beta,theta,theta_0)
 		bool move_angles(); //updates actual angles
 };
 

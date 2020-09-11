@@ -7,16 +7,16 @@ robot_manipulator::robot_manipulator() {
     base_pos = vec3(0, 0, 0);
 
     //forward kinematics testing stuff
-    forward = vec4(0, 45, 45, 90);
+    forward = vec4(70, -102, 34, 90);
     test_forward = true;
 
     float def_len = 1.5f;
     float def_jsz = 0.30f;
     float def_lsz = 0.25f;
     float def_base_sz = 1.5f;
-    this->l1_len = def_len;
-    this->l2_len = def_len;
-    this->l3_len = def_len;
+    this->l1_len = 1.0;
+    this->l2_len = 0.7;
+    this->l3_len = 0.4;
     this->joint_sz = def_jsz;
     this->link_sz = def_lsz;
     this->base_sz = def_base_sz;
@@ -116,11 +116,6 @@ void robot_manipulator::display_info()
 
     ImGui::Begin("Robot info");
 
-    /*
-    ImGui::DragFloat("Link 1" ,&l1_len,0.1f);
-    ImGui::DragFloat("Link 2", &l2_len, 0.1f);
-    ImGui::DragFloat("Link 3", &l3_len, 0.1f);
-    */
     ImGui::Text(alpha_str.c_str());
     ImGui::Text(beta_str.c_str());
     ImGui::Text(theta_str.c_str());
@@ -130,8 +125,17 @@ void robot_manipulator::display_info()
     ImGui::Checkbox("Test forward kinematics", &test_forward);
 
     if(test_forward) ImGui::DragFloat4("Input angles: ", &forward, 1.0f);
-    if(ImGui::Button("Reset angle vector")) forward = vec4(0, 45, 45, 90);
+    if(ImGui::Button("Reset angle vector")) forward = vec4(70, -102, 34, 90);
     ImGui::End();
+
+
+    // Test inverse kinematics (x , y , z ,gamma)
+    vec4 angles = calcIK(vec4(1.0f, 1.0f, 0.0f, 0.0f));
+
+    alpha = angles.x;
+    beta = angles.y;
+    theta = angles.z;
+    theta_0 = angles.w;
 
 }
 
@@ -139,17 +143,12 @@ void robot_manipulator::draw()
 {
 
     //set destination point and draw sphere there
-    vec3 dest = vec3(tot_len, base_sz/2, 0);    // should full extend towards the x-axis
+    /*
+    vec3 dest = vec3(1.0f, base_sz/2 + 1.0f, 0);    // should full extend towards the x-axis
     gl::color(0, 0.5f, 0.5f);
     gl::drawSphere(dest, 0.5f);
+    */
     
-    // Test inverse kinematics
-    vec4 angles = calcIK(vec4(1.5, 0.0f, 0.0f , 0.0f));
-
-    alpha = angles.x;
-    beta = angles.y;
-    theta = angles.z;
-    theta_0 = angles.w;
     
     //check if we're testing forward kinematics
     if (test_forward) {
@@ -189,28 +188,25 @@ void robot_manipulator::draw()
     gl::drawCoordinateFrame();      //draw some unit vectors for referrence
 
     //draw first link
-    gl::translate(vec3(0, joint_sz / 2, 0));
     model[2]->draw();
 
     
     //draw second joint accounting for beta (rotate abt the z axis)
-    gl::translate(vec3(0, l1_len + (joint_sz / 2), 0));
+    gl::translate(vec3(0, l1_len, 0));
     gl::rotate(deg_to_rad(beta), vec3(0, 0, 1));
     model[1]->draw();
     gl::drawCoordinateFrame();      //draw some unit vectors for referrence
 
     //draw second link
-    gl::translate(vec3(0, joint_sz / 2, 0));
     model[3]->draw();
 
     //draw third joint accounting for beta (rotate abt the z axis)
-    gl::translate(vec3(0, l2_len + (joint_sz / 2), 0));
+    gl::translate(vec3(0, l2_len, 0));
     gl::rotate(deg_to_rad(theta), vec3(0, 0, 1));
     model[1]->draw();
     gl::drawCoordinateFrame();      //draw some unit vectors for referrence
 
     //draw third link
-    gl::translate(vec3(0, joint_sz / 2, 0));
     model[4]->draw();
 
     
@@ -232,14 +228,47 @@ vec4 robot_manipulator::calcIK(vec4 dest)
     float r0 = sqrt(r0_sqrd);
     float rz = sqrt((dest.x * dest.x) + (dest.y * dest.y));
 
+
+
+
     //calculating actual angles in degrees
-    float b = 180 - acos( deg_to_rad((L1_sqrd + L2_sqrd - r0_sqrd)/(2 * l1_len * l2_len)) );
-    float a = atan(deg_to_rad(y0/x0)) + acos( deg_to_rad(  (r0_sqrd + L1_sqrd - L2_sqrd) / (2 * r0 * l1_len) ) );
-    float t = dest.w - a - b;
-    float t0 = acos(deg_to_rad(dest.z / rz));
+    float b = 180 - rad_to_deg(acos( deg_to_rad((L1_sqrd + L2_sqrd - r0_sqrd)/(2 * l1_len * l2_len)) ));
+    float a = rad_to_deg( atan(deg_to_rad(y0/x0))) + rad_to_deg( acos( deg_to_rad(  (r0_sqrd + L1_sqrd - L2_sqrd) / (2 * r0 * l1_len) ) ));
+    float t = dest.w - a + b;
+    float t0 = rad_to_deg(acos(deg_to_rad(dest.z / rz)));
     
+
+
+    //panel for debuging
+    string x0_str = "x0: " + std::to_string(x0);
+    string y0_str = "y0: " + std::to_string(y0);
+    string r0_str = "r0: " + std::to_string(r0) + " r0_sqrd: " + std::to_string(r0_sqrd);
+    string rz_str = "rz: " + std::to_string(rz);
+    string l1_str = "L1: " + std::to_string(l1_len) + " L1_sqrd: " + std::to_string(L1_sqrd);
+    string l2_str = "L2: " + std::to_string(l2_len) + " L2_sqrd: " + std::to_string(L2_sqrd);
+    string l3_str = "L3: " + std::to_string(l3_len);
+
+    string input_str = "Input: (" + std::to_string(dest.x) + " , " + std::to_string(dest.y) + " , "
+        + std::to_string(dest.z) + " ) "
+        + "gamma : " + std::to_string(dest.w);
+
+
+    ImGui::Begin("Inverse kinematics debug");
+    ImGui::Text(x0_str.c_str());
+    ImGui::Text(y0_str.c_str());
+    ImGui::Text(r0_str.c_str());
+    ImGui::Text(rz_str.c_str());
+    ImGui::Text(l1_str.c_str());
+    ImGui::Text(l2_str.c_str());
+    ImGui::Text(l3_str.c_str());
+    ImGui::Text(input_str.c_str());
+    
+    ImGui::End();
+
+
     //temporarily update end point
     end_pos = dest;
+
 
     return vec4(a,-b,t,t0);
 }

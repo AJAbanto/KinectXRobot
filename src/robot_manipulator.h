@@ -52,7 +52,7 @@ class robot_manipulator
 
 
 		bool test_forward;	//for testing inverse kinematics
-		vec4 forward;		//forward kinematics vector  
+		vec4 forward;		//forward kinematics testing vector  
 		
 		gl::BatchRef model[5];	//shaders and model container
 		gl::GlslProgRef shader;

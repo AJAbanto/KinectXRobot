@@ -16,7 +16,7 @@ class robot_manipulator
 	public:
 		
 		robot_manipulator();	//default constructor
-		void init(vec3 base_pos, float limb_lens[3], float joint_sz ,float link_sz);	//reset/re-initialize parameters
+		void init(vec3 base_pos, float limb_lens[3], float limb_rads[3], float joint_sz);	//reset/re-initialize parameters
 		
 		vec3 get_base_pos();// returns (x , y , z)
 		vec4 get_end_pos(); // returns (x , y , z , gamma)
@@ -31,6 +31,10 @@ class robot_manipulator
 		float l1_len;		//Link lengths
 		float l2_len;
 		float l3_len;
+
+		float l1_rad;		//link radius
+		float l2_rad;
+		float l3_rad;
 
 		float base_sz;		//Base cube size
 		float link_sz;		//Link radius
@@ -51,7 +55,7 @@ class robot_manipulator
 		vec4 dest_pos;      //destination of end effector	(x,y,z,gamma)
 
 
-		bool test_forward;	//for testing inverse kinematics
+		bool test_forward;	//flag for testing forward kinematics
 		vec4 forward;		//forward kinematics testing vector  
 		
 		gl::BatchRef model[5];	//shaders and model container

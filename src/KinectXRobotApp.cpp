@@ -131,9 +131,9 @@ void KinectXRobotApp::update()
 	ImGui::End();
 
 
+	
 	//display info panel
 	r1.display_info();
-	
 
 	//update camera parameters
 	left_cam.setEyePoint(left_eye_point);

@@ -239,7 +239,9 @@ vec4 robot_manipulator::calcIK(vec4 dest)
     
 
 
-    //panel for debuging
+    //panel for debuging 
+    //Note: can only use this if function not called in draw loop
+    /*
     string x0_str = "x0: " + std::to_string(x0);
     string y0_str = "y0: " + std::to_string(y0);
     string r0_str = "r0: " + std::to_string(r0) + " r0_sqrd: " + std::to_string(r0_sqrd);
@@ -264,7 +266,7 @@ vec4 robot_manipulator::calcIK(vec4 dest)
     ImGui::Text(input_str.c_str());
     
     ImGui::End();
-
+    */
 
     //temporarily update end point
     end_pos = dest;

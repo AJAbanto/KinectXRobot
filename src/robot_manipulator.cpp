@@ -10,14 +10,15 @@ robot_manipulator::robot_manipulator() {
     forward = vec4(70, -102, 34, 90);
     test_forward = true;
 
-    float def_jsz = 0.30f;
-    float def_base_sz = 1.5f;
-    this->l1_len = 1.0;
-    this->l2_len = 0.7;
-    this->l3_len = 0.4;
-    this->l1_rad = 0.25f;
-    this->l2_rad = 0.20f;
-    this->l3_rad = 0.18f;
+    //note all measurements are in milimeters
+    float def_jsz = 50.0f;
+    float def_base_sz = 150.0f;
+    this->l1_len = 300.0f;
+    this->l2_len = 200.0f;
+    this->l3_len = 100.0f;
+    this->l1_rad = 45.0f;
+    this->l2_rad = 40.0f;
+    this->l3_rad = 30.0f;
 
     this->joint_sz = def_jsz;
     this->base_sz = def_base_sz;
@@ -170,16 +171,14 @@ void robot_manipulator::draw()
         theta_0 = forward.w;
     }
     
-
-
-    //some unit vectors for referrence
-    gl::color(Color(1, 0, 0));
-    gl::drawVector(vec3(-3, 0, 0), vec3(-2, 0, 0));
-    gl::color(Color(0, 1, 0));
-    gl::drawVector(vec3(-3, 0, 0), vec3(-3, 1, 0));
-    gl::color(Color(0, 0, 1));
-    gl::drawVector(vec3(-3, 0, 0), vec3(-3, 0, 1));
+    //Coordinate frame dimensions
+    float cf_len = 150.0f;
+    float cf_head_len = 10.0f;
+    float cf_head_rad = 5.0f;
+   
     gl::color(Color(1, 1, 1));
+
+    gl::drawCoordinateFrame(cf_len, cf_head_len, cf_head_rad);      //draw some unit vectors for referrence
 
     //translate to base render position
     gl::translate(base_pos);
@@ -195,7 +194,7 @@ void robot_manipulator::draw()
     
 
     model[1]->draw();
-    gl::drawCoordinateFrame();      //draw some unit vectors for referrence
+    gl::drawCoordinateFrame(150.0f,10.0f,5.0f);      //draw some unit vectors for referrence
 
     //draw first link
     model[2]->draw();
@@ -205,7 +204,7 @@ void robot_manipulator::draw()
     gl::translate(vec3(0, l1_len, 0));
     gl::rotate(deg_to_rad(beta), vec3(0, 0, 1));
     model[1]->draw();
-    gl::drawCoordinateFrame();      //draw some unit vectors for referrence
+    gl::drawCoordinateFrame(cf_len, cf_head_len, cf_head_rad);      //draw some unit vectors for referrence
 
     //draw second link
     model[3]->draw();
@@ -214,7 +213,7 @@ void robot_manipulator::draw()
     gl::translate(vec3(0, l2_len, 0));
     gl::rotate(deg_to_rad(theta), vec3(0, 0, 1));
     model[1]->draw();
-    gl::drawCoordinateFrame();      //draw some unit vectors for referrence
+    gl::drawCoordinateFrame(cf_len, cf_head_len, cf_head_rad);      //draw some unit vectors for referrence
 
     //draw third link
     model[4]->draw();

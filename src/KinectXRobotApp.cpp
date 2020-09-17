@@ -28,6 +28,8 @@ class KinectXRobotApp : public App {
 	vec3 left_look_at;
 	vec3 right_eye_point;
 	vec3 right_look_at;
+	float right_fp;
+	float left_fp;
 
 	//set defaults in this function
 	void set_cam_def();
@@ -120,13 +122,15 @@ void KinectXRobotApp::update()
 	ImGui::Begin("Camera controls");
 	ImGui::DragFloat3("Left eye point", &left_eye_point, 0.01f);
 	ImGui::DragFloat3("Left look at", &left_look_at, 0.01f);
-	ImGui::DragFloat3("Right eye point", &right_eye_point, 0.01f);
-	ImGui::DragFloat3("Right look at", &right_look_at, 0.01f);
+	ImGui::DragFloat("Left farplane", &left_fp, 0.01f);
+	ImGui::DragFloat3("Right eye point", &right_eye_point, 1.0f);
+	ImGui::DragFloat3("Right look at", &right_look_at, 1.0f);
+	ImGui::DragFloat("Right far plane", &right_fp, 1.0f);
 	ImGui::Separator();
 	ImGui::Checkbox("Seated Tracking", &seated_tracking);
 	
-	if(ImGui::Button("View orthogonal z=0")) right_eye_point = vec3(1.5f, 15.0f, 0.0f);
-	if (ImGui::Button("View orthogonal y=0")) right_eye_point = vec3(1.5f, 0.0f, 11.7f);
+	if(ImGui::Button("View orthogonal z=0")) right_eye_point = vec3(300.0f, 1500.0f, 0.0f);
+	if (ImGui::Button("View orthogonal y=0")) right_eye_point = vec3(100.0f, 100.0f, 1500.0f);
 	if (ImGui::Button("Reset Defaults")) set_cam_def();
 	ImGui::End();
 
@@ -138,9 +142,11 @@ void KinectXRobotApp::update()
 	//update camera parameters
 	left_cam.setEyePoint(left_eye_point);
 	left_cam.lookAt(left_look_at);
+	left_cam.setFarClip(left_fp);
 
 	right_cam.setEyePoint(right_eye_point);
 	right_cam.lookAt(right_look_at);
+	right_cam.setFarClip(right_fp);
 
 	//Kinect stuff
 	if (seated_tracking)
@@ -201,9 +207,11 @@ void KinectXRobotApp::draw()
 void KinectXRobotApp::set_cam_def(){
 	left_eye_point = vec3(0.0f, 0.0f, -300.0f);
 	left_look_at = vec3(0.0f);
+	left_fp = left_cam.getFarClip();
 
-	right_eye_point = vec3(1.5f, 0.0f, 11.7f);
-	right_look_at = vec3(1.5f, 1.5f, 0.0f);
+	right_eye_point = vec3(900.0f, 800.0f, 1500.0f);
+	right_look_at = vec3(50.0f, 100.0f, 0.0f);
+	right_fp = 2000.0f;
 }
 
 

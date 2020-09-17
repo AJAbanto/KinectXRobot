@@ -142,7 +142,7 @@ void KinectXRobotApp::update()
 	//update camera parameters
 	left_cam.setEyePoint(left_eye_point);
 	left_cam.lookAt(left_look_at);
-	left_cam.setFarClip(left_fp);
+	//left_cam.setFarClip(left_fp);
 
 	right_cam.setEyePoint(right_eye_point);
 	right_cam.lookAt(right_look_at);
@@ -201,7 +201,7 @@ void KinectXRobotApp::draw()
 	left_cam_farplane.draw();
 
 	//draw skeleton
-	//draw_skeleton();
+	draw_skeleton();
 }
 
 void KinectXRobotApp::set_cam_def(){

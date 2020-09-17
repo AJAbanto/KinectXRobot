@@ -42,9 +42,8 @@ class KinectXRobotApp : public App {
 	robot_manipulator r1;
 
 	//Start of Kinect stuff
-
+	//Flags and handlers
 	HRESULT hr;
-
 	HANDLE Skel_dready;
 
 	//Sensor object
@@ -52,6 +51,14 @@ class KinectXRobotApp : public App {
 
 	//for seated tracking mode
 	bool seated_tracking;
+	
+	//Faux origin
+	vec3 faux_origin;
+	bool faux_origin_set;
+
+	//int for choosing which target to track for displacement
+	int tracking_target;
+
 
 	//Skeleton data 
 	NUI_SKELETON_FRAME c_skeletonFrame;
@@ -67,6 +74,9 @@ class KinectXRobotApp : public App {
 
 	//function to get coordinate of arbitrary joint
 	void get_joint_coordinate();
+
+	//function to set faux origin;
+	void set_faux_origin();
 
 	//function to draw lines as bones in 3D space
 	void draw3D_bone(NUI_SKELETON_DATA skeletonData,
@@ -104,8 +114,10 @@ void KinectXRobotApp::setup()
 	right_cam.lookAt(right_look_at);
 
 
-	//initialize kinect stuff
+	//initialize kinect tracking stuff
 	seated_tracking = true;
+	faux_origin_set = false;
+	tracking_target = 0;
 
 	this->hr = init_kinect();
 	if (FAILED(this->hr))
@@ -160,6 +172,23 @@ void KinectXRobotApp::update()
 		get_joint_coordinate();
 	}
 
+	std::vector<std::string> tracking_targets;
+	tracking_targets.push_back("Head");
+	tracking_targets.push_back("Left hand");
+	tracking_targets.push_back("Right hand");
+	tracking_targets.push_back("Left foot");
+	tracking_targets.push_back("Right foot");
+
+	ImGui::Begin("Kinect output");
+	ImGui::Combo("Tracking target", &tracking_target, tracking_targets);
+	if (ImGui::Button("Set faux_origin")) set_faux_origin();
+	string faux_origin_string = "Faux origin ( " + std::to_string(faux_origin.x) + ", " 
+		+ std::to_string(faux_origin.y) + ", " + std::to_string(faux_origin.z) + ")";
+	ImGui::Text(faux_origin_string.c_str());
+
+
+	ImGui::End();
+
 	
 }
 
@@ -173,8 +202,6 @@ void KinectXRobotApp::draw()
 	gl::setMatrices(right_cam);
 
 	//draw robot
-
-
 	r1.draw();
 	
 
@@ -200,7 +227,7 @@ void KinectXRobotApp::draw()
 	left_cam_farplane.vertex(wbotright);
 	left_cam_farplane.draw();
 
-	//draw skeleton
+	//draw skeleton 
 	draw_skeleton();
 }
 
@@ -314,6 +341,60 @@ void KinectXRobotApp::get_joint_coordinate() {
 
 }
 
+void KinectXRobotApp::set_faux_origin()
+{
+	//Idea: cycle through all skeleton data, might help stabalize tracking
+	//Transfer to proper variable
+	NUI_SKELETON_DATA skeletonData = c_skeletonFrame.SkeletonData[0];
+
+	for (int i = 0; skeletonData.eTrackingState == NUI_SKELETON_NOT_TRACKED; i++) {
+		if (i >= 6) return;
+		else skeletonData = c_skeletonFrame.SkeletonData[i];
+	}
+
+	if (skeletonData.eTrackingState != NUI_SKELETON_NOT_TRACKED) {
+
+		//assume that head is tracked so we get the data
+		Vector4 tracked_pos = Vector4();
+		
+		Vector4 head_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_HEAD];
+		Vector4 left_hand_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_HAND_LEFT];
+		Vector4 right_hand_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_HAND_RIGHT];
+		Vector4 left_foot_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_FOOT_LEFT];
+		Vector4 right_foot_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_FOOT_RIGHT];
+
+		switch (tracking_target) {
+			case 0:
+				tracked_pos = head_pos;
+				break;
+			case 1:
+				tracked_pos = left_hand_pos;
+				break;
+			case 2:
+				tracked_pos = right_hand_pos;
+				break;
+			case 3:
+				tracked_pos = left_foot_pos;
+				break;
+			case 4:
+				tracked_pos = right_foot_pos;
+				break;
+			default:
+				tracked_pos = left_hand_pos;
+		}
+
+		//set faux origin temporarily via hardcoding and scale to cm from raw m values
+		float scalar = 100.0f;
+		faux_origin = vec3(tracked_pos.x * scalar, tracked_pos.y * scalar, tracked_pos.z * scalar);
+
+		if (!faux_origin_set) faux_origin_set = true;
+
+		return;
+	}
+}
+
+
+
 
 //drawing some bones here
 
@@ -365,8 +446,48 @@ void KinectXRobotApp::draw_skeleton() {
 
 	}
 
-	//Draw bones here
+	//draw vector from faux_origin to tracked target (temporarily left hand) if faux origin has been set
+	if (faux_origin_set) {
+		//get trackig target
 
+		Vector4 tracked_pos = Vector4();
+
+		Vector4 head_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_HEAD];
+		Vector4 left_hand_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_HAND_LEFT];
+		Vector4 right_hand_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_HAND_RIGHT];
+		Vector4 left_foot_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_FOOT_LEFT];
+		Vector4 right_foot_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_FOOT_RIGHT];
+
+		switch (tracking_target) {
+		case 0:
+			tracked_pos = head_pos;
+			break;
+		case 1:
+			tracked_pos = left_hand_pos;
+			break;
+		case 2:
+			tracked_pos = right_hand_pos;
+			break;
+		case 3:
+			tracked_pos = left_foot_pos;
+			break;
+		case 4:
+			tracked_pos = right_foot_pos;
+			break;
+		default:
+			tracked_pos = left_hand_pos;
+		}
+
+		float scalar = 100.0f;	//convert to cm from m
+		vec3 target_pos = vec3(tracked_pos.x * scalar, tracked_pos.y * scalar , tracked_pos.z * scalar);
+		
+		//assume faux_origin has been set and scaled properly
+		gl::color(Color(1, 0, 0));
+		gl::lineWidth(8);
+		gl::drawLine(faux_origin, target_pos);
+		gl::color(Color(1, 1, 1));
+	}
+	//Draw bones here
 
 	//3D render mode
 	draw3D_bone(skeletonData, NUI_SKELETON_POSITION_HEAD, NUI_SKELETON_POSITION_SHOULDER_CENTER);

@@ -151,6 +151,10 @@ void robot_manipulator::display_info()
 
 }
 
+void robot_manipulator::set_dest(vec4 dest)
+{
+}
+
 void robot_manipulator::draw()
 {
 

@@ -40,6 +40,11 @@ class KinectXRobotApp : public App {
 
 	//robot manipulator model
 	robot_manipulator r1;
+	
+	//robot model control
+	vec4 robot_dest;	//vector to be passed to robot model  
+	vec3 robot_home_point; //home position or initial position of model 
+
 
 	//Start of Kinect stuff
 	//Flags and handlers
@@ -52,12 +57,18 @@ class KinectXRobotApp : public App {
 	//for seated tracking mode
 	bool seated_tracking;
 	
-	//Faux origin
+	//Faux origin for setting which point is the displacement if referrenced to
 	vec3 faux_origin;
 	bool faux_origin_set;
 
-	//int for choosing which target to track for displacement
-	int tracking_target;
+	int tracking_target;	//int for choosing which target to track for displacement
+	bool apply_displacement; //flag for applying displacement
+	vec3 displacement;		//displacement vector calculated relative to origin
+
+
+	
+
+
 
 
 	//Skeleton data 
@@ -118,6 +129,12 @@ void KinectXRobotApp::setup()
 	seated_tracking = true;
 	faux_origin_set = false;
 	tracking_target = 0;
+	apply_displacement = false;
+
+	//initialize robot model position to home point
+	robot_home_point = vec3(250, 250, 0);		//x=250, y=250, z=0;
+	robot_dest = vec4(robot_home_point, 0);		//home point , gamma = 0;
+	r1.set_dest(robot_dest);					//move robot to home point
 
 	this->hr = init_kinect();
 	if (FAILED(this->hr))
@@ -146,19 +163,42 @@ void KinectXRobotApp::update()
 	if (ImGui::Button("Reset Defaults")) set_cam_def();
 	ImGui::End();
 
-
-	
-	//display info panel
-	r1.display_info();
-
 	//update camera parameters
 	left_cam.setEyePoint(left_eye_point);
 	left_cam.lookAt(left_look_at);
-	//left_cam.setFarClip(left_fp);
 
 	right_cam.setEyePoint(right_eye_point);
 	right_cam.lookAt(right_look_at);
 	right_cam.setFarClip(right_fp);
+	
+
+	//Get robot model information
+	vec4 angles = r1.get_angles();
+	string alpha_str = "Alpha:   " + std::to_string(angles.x);
+	string beta_str = "Beta:    " + std::to_string(angles.y);
+	string theta_str = "Theta:   " + std::to_string(angles.z);
+	string theta_0_str = "Theta_0: " + std::to_string(angles.w);
+	
+
+	//Update robot end effector destination and reset to home point
+	ImGui::Begin("Robot model control panel");
+	ImGui::DragFloat4("End effector pos: ", &robot_dest, 1.0f, 0.0f, 400.0f);
+	ImGui::Text(alpha_str.c_str());
+	ImGui::Text(beta_str.c_str());
+	ImGui::Text(theta_str.c_str());
+	ImGui::Text(theta_0_str.c_str());
+	if (ImGui::Button("Home robotmodel")) robot_dest = vec4(robot_home_point,0);	//reset to home point
+	ImGui::Checkbox("Apply displacement vector", &apply_displacement);
+	ImGui::End();
+
+
+	//if apply displacement flag is set then update robot using displacement vector
+	if (apply_displacement) {
+		robot_dest = vec4(robot_home_point + displacement,0);
+	}
+
+	//update robot arm destination
+	r1.set_dest(robot_dest);
 
 	//Kinect stuff
 	if (seated_tracking)
@@ -172,6 +212,7 @@ void KinectXRobotApp::update()
 		get_joint_coordinate();
 	}
 
+	//Vector for tracking options
 	std::vector<std::string> tracking_targets;
 	tracking_targets.push_back("Head");
 	tracking_targets.push_back("Left hand");
@@ -179,13 +220,21 @@ void KinectXRobotApp::update()
 	tracking_targets.push_back("Left foot");
 	tracking_targets.push_back("Right foot");
 
+	//Displacement vector info
+	string displacement_str = "displacement: (" + std::to_string(displacement.x) + " , " + std::to_string(displacement.y) + " , "
+		+ std::to_string(displacement.z) + " )";
+
+
+	//Kinect tracking control
 	ImGui::Begin("Kinect output");
 	ImGui::Combo("Tracking target", &tracking_target, tracking_targets);
 	if (ImGui::Button("Set faux_origin")) set_faux_origin();
+
 	string faux_origin_string = "Faux origin ( " + std::to_string(faux_origin.x) + ", " 
 		+ std::to_string(faux_origin.y) + ", " + std::to_string(faux_origin.z) + ")";
-	ImGui::Text(faux_origin_string.c_str());
 
+	ImGui::Text(faux_origin_string.c_str());
+	ImGui::Text(displacement_str.c_str());
 
 	ImGui::End();
 
@@ -285,8 +334,6 @@ HRESULT KinectXRobotApp::init_kinect() {
 
 	return S_OK;
 }
-
-//Function to draw entire skeleton
 
 
 //function to get new skeleton frame every after draw loop
@@ -481,11 +528,15 @@ void KinectXRobotApp::draw_skeleton() {
 		float scalar = 100.0f;	//convert to cm from m
 		vec3 target_pos = vec3(tracked_pos.x * scalar, tracked_pos.y * scalar , tracked_pos.z * scalar);
 		
+
 		//assume faux_origin has been set and scaled properly
 		gl::color(Color(1, 0, 0));
 		gl::lineWidth(8);
 		gl::drawLine(faux_origin, target_pos);
 		gl::color(Color(1, 1, 1));
+
+		//calculate and record displacement to be applied to robot
+		if(apply_displacement) displacement = target_pos - faux_origin;	
 	}
 	//Draw bones here
 

@@ -8,7 +8,7 @@ robot_manipulator::robot_manipulator() {
 
     //forward kinematics testing stuff
     forward = vec4(70, -102, 34, 90);
-    test_forward = true;
+    test_forward = false;
 
     //note all measurements are in milimeters
     float def_jsz = 50.0f;
@@ -110,9 +110,7 @@ vec4 robot_manipulator::get_angles()
 
 void robot_manipulator::display_info()
 {
-
-    
-
+    //use only for debugging otherwise use external functions to extract information
     string alpha_str = "Alpha:   " + std::to_string(alpha);
     string beta_str = "Beta:    " + std::to_string(beta);
     string theta_str = "Theta:   " + std::to_string(theta);
@@ -136,34 +134,32 @@ void robot_manipulator::display_info()
     ImGui::End();
 
     
-    // Test inverse kinematics (x , y , z ,gamma)
-
-    vec4 angles = calcIK(vec4(1.0f, 1.0f, 1.0f,45.0f));
-
-    alpha = angles.x;
-    beta = angles.y;
-    theta = angles.z;
-    theta_0 = angles.w;
-
-    gamma = alpha + beta + theta;
-    
     
 
 }
 
 void robot_manipulator::set_dest(vec4 dest)
 {
+    //update end effector position to be destination set
+    this->end_pos = vec3(dest.x, dest.y, dest.z);
+
+    vec4 angles = calcIK(dest);
+    alpha = angles.x;
+    beta = angles.y;
+    theta = angles.z;
+    theta_0 = angles.w;
+
 }
 
 void robot_manipulator::draw()
 {
 
     //set destination point and draw sphere there
-    
+    /*
     vec3 dest = vec3(end_pos.x, base_sz/2 + end_pos.y, end_pos.z);    // should full extend towards the x-axis
     gl::color(0, 0.5f, 0.5f);
     gl::drawSphere(dest, 0.25f);
-    
+    */
    
     
     
@@ -198,7 +194,7 @@ void robot_manipulator::draw()
     
 
     model[1]->draw();
-    gl::drawCoordinateFrame(150.0f,10.0f,5.0f);      //draw some unit vectors for referrence
+    gl::drawCoordinateFrame(cf_len, cf_head_len, cf_head_rad);      //draw some unit vectors for referrence
 
     //draw first link
     model[2]->draw();
@@ -249,8 +245,6 @@ vec4 robot_manipulator::calcIK(vec4 dest)
     float t0 = rad_to_deg(acos(dest.z / rz));
     
 
-    //update end point for debugging
-    end_pos = vec3(dest.x,dest.y,dest.z);
 
     //ImGui panel for debuging 
     //Note: can only use this if function not called in draw loop

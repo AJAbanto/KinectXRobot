@@ -142,7 +142,8 @@ void robot_manipulator::set_dest(vec4 dest)
 {
     //update end effector position to be destination set
     this->end_pos = vec3(dest.x, dest.y, dest.z);
-
+    
+    //instantaneously set angle
     vec4 angles = calcIK(dest);
     alpha = angles.x;
     beta = angles.y;

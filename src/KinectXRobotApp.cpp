@@ -6,6 +6,8 @@
 #include <Windows.h>
 #include <iostream>
 #include <string>
+#include <queue>
+
 #include "NuiApi.h"
 #include "robot_manipulator.h"
 
@@ -45,6 +47,11 @@ class KinectXRobotApp : public App {
 	vec4 robot_dest;	//vector to be passed to robot model  
 	vec3 robot_home_point; //home position or initial position of model 
 
+	queue <vec4> gcode_queue;	//queue of vector positions to pass to robot model
+	vector <string> gcode_string_vector;	//vector of strings of points in the queue
+
+	int gcode_queue_len;		//queue length
+	bool send_gcode;			//serial communication flag
 
 	//Start of Kinect stuff
 	//Flags and handlers
@@ -64,9 +71,6 @@ class KinectXRobotApp : public App {
 	int tracking_target;	//int for choosing which target to track for displacement
 	bool apply_displacement; //flag for applying displacement
 	vec3 displacement;		//displacement vector calculated relative to origin
-
-
-	
 
 
 
@@ -132,6 +136,7 @@ void KinectXRobotApp::setup()
 	apply_displacement = false;
 
 	//initialize robot model position to home point
+	gcode_queue_len = 10;						//store 10 points at a time
 	robot_home_point = vec3(250, 250, 0);		//x=250, y=250, z=0;
 	robot_dest = vec4(robot_home_point, 0);		//home point , gamma = 0;
 	r1.set_dest(robot_dest);					//move robot to home point
@@ -189,12 +194,50 @@ void KinectXRobotApp::update()
 	ImGui::Text(theta_0_str.c_str());
 	if (ImGui::Button("Home robotmodel")) robot_dest = vec4(robot_home_point,0);	//reset to home point
 	ImGui::Checkbox("Apply displacement vector", &apply_displacement);
+	
+	int dummy = 0;	//dummy vairable
+	ImGui::ListBox("Tracking queue", &dummy, gcode_string_vector, gcode_queue_len);	//view gcode queue
+	ImGui::Checkbox("Send gcode", &send_gcode);	//flag to start serial communication
+
 	ImGui::End();
 
 
+	
+
+	//robot displacement to apply to robot model
+	vec4 robot_displacement = vec4(robot_home_point + displacement, 0);
+	gcode_queue.push(robot_displacement);	//queue the displacement
+	
+	//convert coordinate to string
+	string robot_displacement_str = "X" + to_string(robot_displacement.x) + " Y" + to_string(robot_displacement.y) + " Z" + to_string(robot_displacement.z);
+	gcode_string_vector.push_back(robot_displacement_str);
+
 	//if apply displacement flag is set then update robot using displacement vector
-	if (apply_displacement) {
-		robot_dest = vec4(robot_home_point + displacement,0);
+	//also check the queue if it's has more than 3 otherwise points wait
+	if (apply_displacement && gcode_queue.size() > 3) {
+		
+		robot_dest = gcode_queue.front() ;
+		gcode_queue.pop();
+
+
+		//move vector of string list forward
+		if (!gcode_string_vector.empty()) {
+			for (int i = 0; i < gcode_string_vector.size() - 1; i++)
+				gcode_string_vector[i] = gcode_string_vector[i+1];
+		}
+	}
+	
+	//trim vector
+	while (gcode_string_vector.size() > gcode_queue_len)
+		gcode_string_vector.pop_back();
+	
+	//trim queue to ensure that command queue is at appropriate length
+	while (gcode_queue.size() > gcode_queue_len)
+		gcode_queue.pop();
+
+	
+	if (send_gcode) {
+		//send gcode here
 	}
 
 	//update robot arm destination
@@ -236,8 +279,10 @@ void KinectXRobotApp::update()
 	ImGui::Text(faux_origin_string.c_str());
 	ImGui::Text(displacement_str.c_str());
 
+	
 	ImGui::End();
 
+	//ImGui::ShowDemoWindow();
 	
 }
 

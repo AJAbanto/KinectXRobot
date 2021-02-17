@@ -167,29 +167,7 @@ void KinectXRobotApp::mouseDown( MouseEvent event )
 
 void KinectXRobotApp::update()
 {
-	//Modify camera stuff
-	ImGui::Begin("Camera controls");
-	ImGui::DragFloat3("Left eye point", &left_eye_point, 0.01f);
-	ImGui::DragFloat3("Left look at", &left_look_at, 0.01f);
-	ImGui::DragFloat("Left farplane", &left_fp, 0.01f);
-	ImGui::DragFloat3("Right eye point", &right_eye_point, 1.0f);
-	ImGui::DragFloat3("Right look at", &right_look_at, 1.0f);
-	ImGui::DragFloat("Right far plane", &right_fp, 1.0f);
-	ImGui::Separator();
-	ImGui::Checkbox("Seated Tracking", &seated_tracking);
 	
-	if(ImGui::Button("View orthogonal z=0")) right_eye_point = vec3(300.0f, 1500.0f, 0.0f);
-	if (ImGui::Button("View orthogonal y=0")) right_eye_point = vec3(100.0f, 100.0f, 1500.0f);
-	if (ImGui::Button("Reset Defaults")) set_cam_def();
-	ImGui::End();
-
-	//update camera parameters
-	left_cam.setEyePoint(left_eye_point);
-	left_cam.lookAt(left_look_at);
-
-	right_cam.setEyePoint(right_eye_point);
-	right_cam.lookAt(right_look_at);
-	right_cam.setFarClip(right_fp);
 	
 
 	//Get robot model information
@@ -208,6 +186,7 @@ void KinectXRobotApp::update()
 	ImGui::Text(theta_str.c_str());
 	ImGui::Text(theta_0_str.c_str());
 	if (ImGui::Button("Home robotmodel")) robot_dest = vec4(robot_home_point,0);	//reset to home point
+	ImGui::SameLine();
 	ImGui::Checkbox("Apply displacement vector", &apply_displacement);
 	
 
@@ -236,16 +215,23 @@ void KinectXRobotApp::update()
 			ImGui::EndPopup();
 		}
 	}else {
+
+		//Serial message 
+		static char writebuff[32] = "";
+		ImGui::InputText("Serial Message", writebuff, 32, ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsNoBlank);
+
+		if (ImGui::Button("send")) {
+			s1.write(writebuff);
+		}
+
 		if(ImGui::Button("Close port connection")) { //If port already opened give show button to close
 			s1.close();								//close port
 			port_opened = false;					//reset flag to allow reconnection
 		}
 	}
 
-	int dummy = 0;	//dummy vairable
-	ImGui::ListBox("Tracking queue", &dummy, gcode_string_vector, gcode_queue_len);	//view gcode queue
+	
 	ImGui::Checkbox("Send gcode", &send_gcode);	//flag to start serial communication
-
 	
 
 	ImGui::End();
@@ -321,28 +307,61 @@ void KinectXRobotApp::update()
 	tracking_targets.push_back("Right foot");
 
 	//Displacement vector info
-	string displacement_str = "displacement: (" + std::to_string(displacement.x) + " , " + std::to_string(displacement.y) + " , "
+	string displacement_str = "Displacement: (" + std::to_string(displacement.x) + " , " + std::to_string(displacement.y) + " , "
 		+ std::to_string(displacement.z) + " )";
 
+	//Faux origin vector info
+	string faux_origin_string = "Faux origin ( " + std::to_string(faux_origin.x) + ", "
+		+ std::to_string(faux_origin.y) + ", " + std::to_string(faux_origin.z) + ")";
 
 	//Kinect tracking control window
 	ImGui::Begin("Kinect output");
+	
 	ImGui::Combo("Tracking target", &tracking_target, tracking_targets);
-	if (ImGui::Button("Set faux_origin")) set_faux_origin();
-
-	string faux_origin_string = "Faux origin ( " + std::to_string(faux_origin.x) + ", " 
-		+ std::to_string(faux_origin.y) + ", " + std::to_string(faux_origin.z) + ")";
+	ImGui::Checkbox("Seated Tracking", &seated_tracking);
 
 	ImGui::Text(faux_origin_string.c_str());
-	ImGui::Text(displacement_str.c_str());
+	if (ImGui::Button("Set new faux origin")) set_faux_origin();
 
+	ImGui::Text(displacement_str.c_str());
+	int dummy = 0;	//dummy vairable
+	ImGui::ListBox("Displacement queue", &dummy, gcode_string_vector, gcode_queue_len);	//view gcode queue
 	
+
+	ImGui::Spacing();
+	ImGui::Separator();
+
+	//Camera controls for the skeleton renderer window
+	if (ImGui::TreeNode("Skeleton renderer camera controls")) {
+		ImGui::DragFloat3("Left eye point", &left_eye_point, 0.01f);
+		ImGui::DragFloat3("Left look at", &left_look_at, 0.01f);
+		ImGui::DragFloat("Left farplane", &left_fp, 0.01f);
+		ImGui::DragFloat3("Right eye point", &right_eye_point, 1.0f);
+		ImGui::DragFloat3("Right look at", &right_look_at, 1.0f);
+		ImGui::DragFloat("Right far plane", &right_fp, 1.0f);
+		
+
+		if (ImGui::Button("View orthogonal z=0")) right_eye_point = vec3(300.0f, 1500.0f, 0.0f);
+		if (ImGui::Button("View orthogonal y=0")) right_eye_point = vec3(100.0f, 100.0f, 1500.0f);
+		if (ImGui::Button("Reset Defaults")) set_cam_def();
+		ImGui::TreePop();
+	}
 	
 	ImGui::End();
 
+
 	
 
-	ImGui::ShowDemoWindow();
+	//update camera parameters
+	left_cam.setEyePoint(left_eye_point);
+	left_cam.lookAt(left_look_at);
+
+	right_cam.setEyePoint(right_eye_point);
+	right_cam.lookAt(right_look_at);
+	right_cam.setFarClip(right_fp);
+	
+
+	//ImGui::ShowDemoWindow();
 	
 }
 

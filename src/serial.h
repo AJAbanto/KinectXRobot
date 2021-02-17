@@ -1,3 +1,12 @@
+/*
+    Please refer to: 
+        - https://aticleworld.com/serial-port-programming-using-win32-api/
+        - https://docs.microsoft.com/en-us/previous-versions/ff802693(v=msdn.10)?redirectedfrom=MSDN
+    for and idea on how this abstraction was written
+*/
+
+
+
 #pragma once
 #include <Windows.h>
 

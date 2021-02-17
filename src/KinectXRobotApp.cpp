@@ -10,6 +10,7 @@
 
 #include "NuiApi.h"
 #include "robot_manipulator.h"
+#include "serial.h"
 
 using namespace ci;
 using namespace ci::app;
@@ -36,6 +37,7 @@ class KinectXRobotApp : public App {
 	//set defaults in this function
 	void set_cam_def();
 
+	
 
 	static const int res_width = 320;
 	static const int res_height = 240;
@@ -47,9 +49,12 @@ class KinectXRobotApp : public App {
 	vec4 robot_dest;	//vector to be passed to robot model  
 	vec3 robot_home_point; //home position or initial position of model 
 
+	//robot serial communication
 	queue <vec4> gcode_queue;	//queue of vector positions to pass to robot model
 	vector <string> gcode_string_vector;	//vector of strings of points in the queue
 
+	SerialPort s1;
+	bool port_opened;			//port status bool
 	int gcode_queue_len;		//queue length
 	bool send_gcode;			//serial communication flag
 
@@ -136,14 +141,24 @@ void KinectXRobotApp::setup()
 	apply_displacement = false;
 
 	//initialize robot model position to home point
-	gcode_queue_len = 10;						//store 10 points at a time
+	
 	robot_home_point = vec3(250, 250, 0);		//x=250, y=250, z=0;
 	robot_dest = vec4(robot_home_point, 0);		//home point , gamma = 0;
 	r1.set_dest(robot_dest);					//move robot to home point
 
+
+	//initialize serial port status
+	gcode_queue_len = 10;						//store 10 points at a time
+	port_opened = false;
+	s1 = SerialPort();						   //intantiate port object
+
+	//initiate kinect device communication
 	this->hr = init_kinect();
 	if (FAILED(this->hr))
 		quit();
+
+	
+
 }
 
 void KinectXRobotApp::mouseDown( MouseEvent event )
@@ -195,14 +210,47 @@ void KinectXRobotApp::update()
 	if (ImGui::Button("Home robotmodel")) robot_dest = vec4(robot_home_point,0);	//reset to home point
 	ImGui::Checkbox("Apply displacement vector", &apply_displacement);
 	
+
+	
+	//Starting communication Port
+	
+	if (!port_opened) {								//Port not yet opened
+		
+		static char buff[32] = "";
+		ImGui::InputText("port", buff,32, ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsNoBlank);
+		
+		//Attempt to open port
+		if (ImGui::Button("Open port\n")) {
+			
+			if (s1.open(buff) == -1) ImGui::OpenPopup("Error COM port");	//throw error and prepare error modal window
+			else {
+				port_opened = true;										//else raise flag to indicate port is opened
+				s1.write("Starting Transmission;");
+			}
+		}
+		//if failed to open port show error modal window
+		if (ImGui::BeginPopupModal("Error COM port", NULL, 0)) {
+			ImGui::Text("Could not open port. Please try again");
+			if (ImGui::Button("close"))
+				ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
+	}else {
+		if(ImGui::Button("Close port connection")) { //If port already opened give show button to close
+			s1.close();								//close port
+			port_opened = false;					//reset flag to allow reconnection
+		}
+	}
+
 	int dummy = 0;	//dummy vairable
 	ImGui::ListBox("Tracking queue", &dummy, gcode_string_vector, gcode_queue_len);	//view gcode queue
 	ImGui::Checkbox("Send gcode", &send_gcode);	//flag to start serial communication
 
+	
+
 	ImGui::End();
 
 
-	
 
 	//robot displacement to apply to robot model
 	vec4 robot_displacement = vec4(robot_home_point + displacement, 0);
@@ -235,9 +283,18 @@ void KinectXRobotApp::update()
 	while (gcode_queue.size() > gcode_queue_len)
 		gcode_queue.pop();
 
+
 	
+
+
+
 	if (send_gcode) {
 		//send gcode here
+
+		//------Serial communication here -------//
+
+
+		//--------------------------------------//
 	}
 
 	//update robot arm destination
@@ -268,7 +325,7 @@ void KinectXRobotApp::update()
 		+ std::to_string(displacement.z) + " )";
 
 
-	//Kinect tracking control
+	//Kinect tracking control window
 	ImGui::Begin("Kinect output");
 	ImGui::Combo("Tracking target", &tracking_target, tracking_targets);
 	if (ImGui::Button("Set faux_origin")) set_faux_origin();
@@ -280,9 +337,12 @@ void KinectXRobotApp::update()
 	ImGui::Text(displacement_str.c_str());
 
 	
+	
 	ImGui::End();
 
-	//ImGui::ShowDemoWindow();
+	
+
+	ImGui::ShowDemoWindow();
 	
 }
 

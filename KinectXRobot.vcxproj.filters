@@ -14,9 +14,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\KinectXRobotApp.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\KinectXRobotApp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -25,13 +22,13 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\include\Resources.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\robot_manipulator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\Resources.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\serial.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

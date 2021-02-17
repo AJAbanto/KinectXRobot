@@ -104,6 +104,7 @@
   <ItemGroup>
     <ClInclude Include="include\Resources.h" />
     <ClInclude Include="src\robot_manipulator.h" />
+    <ClInclude Include="src\serial.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resources.rc" />

@@ -111,7 +111,7 @@ int SerialPort::open(char * port_name) {
 void SerialPort::write(char* buff) {
     
     char SerialBuffer[128] = { 0 };     
-    strcpy(SerialBuffer, buff); //convert to char* 
+    sprintf(SerialBuffer, "%s\n", buff);
 
     Status = WriteFile(this->hPort,// Handle to the Serialport
         SerialBuffer,            // Data to be written to the port

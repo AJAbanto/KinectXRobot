@@ -12,6 +12,16 @@
 #include "robot_manipulator.h"
 #include "serial.h"
 
+//Taken from stack over flow for debugging printf
+#include <sstream>
+
+#define DBOUT( s )            \
+{                             \
+   std::wostringstream os_;    \
+   os_ << s;                   \
+   OutputDebugStringW( os_.str().c_str() );  \
+}
+
 using namespace ci;
 using namespace ci::app;
 using namespace std;
@@ -139,7 +149,7 @@ void KinectXRobotApp::setup()
 	faux_origin_set = false;
 	tracking_target = 0;
 	apply_displacement = false;
-
+	
 	//initialize robot model position to home point
 	
 	robot_home_point = vec3(250, 250, 0);		//x=250, y=250, z=0;
@@ -150,6 +160,7 @@ void KinectXRobotApp::setup()
 	//initialize serial port status
 	gcode_queue_len = 10;						//store 10 points at a time
 	port_opened = false;
+	send_gcode = false;
 	s1 = SerialPort();						   //intantiate port object
 
 	//initiate kinect device communication
@@ -216,22 +227,38 @@ void KinectXRobotApp::update()
 		}
 	}else {
 
-		//Serial message 
-		static char writebuff[32] = "";
-		ImGui::InputText("Serial Message", writebuff, 32, ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsNoBlank);
+		
+		
+		if (send_gcode == true) {
+			ImGui::Text("STREAMING GCODE..");
+			if (ImGui::Button("Stop gcode stream")) send_gcode = false;
+		}
+		else {
 
-		if (ImGui::Button("send")) {
-			s1.write(writebuff);
+			//If not streaming gcode , allow user to send discreet gcode commands
+			//Note:
+			//Each serial message will be sent after appending a newline character at the end of the gcode command string
+			static char writebuff[32] = "";
+			ImGui::InputText("gcode command", writebuff, 32, 0);
+			ImGui::SameLine();
+			if (ImGui::Button("send")) {
+				s1.write(writebuff);
+			}
+
+			if (ImGui::Button("Start gcode stream")) send_gcode = true;
+
+			if (ImGui::Button("Close port connection")) { //If port already opened give show button to close
+				s1.close();								//close port
+				port_opened = false;					//reset flag to allow reconnection
+			}
+
 		}
 
-		if(ImGui::Button("Close port connection")) { //If port already opened give show button to close
-			s1.close();								//close port
-			port_opened = false;					//reset flag to allow reconnection
-		}
+
+		
 	}
 
 	
-	ImGui::Checkbox("Send gcode", &send_gcode);	//flag to start serial communication
 	
 
 	ImGui::End();
@@ -277,8 +304,10 @@ void KinectXRobotApp::update()
 	if (send_gcode) {
 		//send gcode here
 
-		//------Serial communication here -------//
-
+		//------Streaming Gcode continously here -------//
+		char gcode_buff[128] = { 0 };
+		sprintf(gcode_buff, "X%f Y%f Z%f",robot_dest.x, robot_dest.y,robot_dest.z);
+		s1.write(gcode_buff);
 
 		//--------------------------------------//
 	}

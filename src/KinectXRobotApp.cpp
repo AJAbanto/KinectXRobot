@@ -56,8 +56,12 @@ class KinectXRobotApp : public App {
 	robot_manipulator r1;
 	
 	//robot model control
-	vec4 robot_dest;	//vector to be passed to robot model  
-	vec3 robot_home_point; //home position or initial position of model 
+	vec4 robot_dest;		//vector to be passed to robot model  
+	vec3 robot_home_point;	//home position or initial position of model 
+	
+	//robot model length parameters
+	const float f_incre = 5.0f;
+	vec4 default_lens;      //vector containing initial limb and base lengths for robot model
 
 	//robot serial communication
 	queue <vec4> gcode_queue;	//queue of vector positions to pass to robot model
@@ -83,10 +87,11 @@ class KinectXRobotApp : public App {
 	vec3 faux_origin;
 	bool faux_origin_set;
 
-	int tracking_target;	//int for choosing which target to track for displacement
-	bool apply_displacement; //flag for applying displacement
-	vec3 displacement;		//displacement vector calculated relative to origin
-
+	int tracking_target;		//int for choosing which target to track for displacement
+	bool apply_displacement;	//flag for applying displacement
+	vec3 displacement;			//displacement vector calculated relative to origin
+	float displacement_mult;	//scalar multiplier to change sensitivity of displacement vector
+	
 
 
 
@@ -149,11 +154,16 @@ void KinectXRobotApp::setup()
 	faux_origin_set = false;
 	tracking_target = 0;
 	apply_displacement = false;
-	
+	displacement_mult = 1.0f;
+
 	//initialize robot model position to home point
 	
 	robot_home_point = vec3(250, 250, 0);		//x=250, y=250, z=0;
 	robot_dest = vec4(robot_home_point, 0);		//home point , gamma = 0;
+
+	//record initial robot limb lengths
+	default_lens = r1.get_limb_lens();			//get initial limb lens
+
 	r1.set_dest(robot_dest);					//move robot to home point
 
 
@@ -189,20 +199,86 @@ void KinectXRobotApp::update()
 	string theta_0_str = "Theta_0: " + std::to_string(angles.w);
 	
 
-	//Update robot end effector destination and reset to home point
+	//Update robot end effector destination or reset to home point
 	ImGui::Begin("Robot model control panel");
-	ImGui::DragFloat4("End effector pos: ", &robot_dest, 1.0f, 0.0f, 400.0f);
-	ImGui::Text(alpha_str.c_str());
-	ImGui::Text(beta_str.c_str());
-	ImGui::Text(theta_str.c_str());
-	ImGui::Text(theta_0_str.c_str());
-	if (ImGui::Button("Home robotmodel")) robot_dest = vec4(robot_home_point,0);	//reset to home point
-	ImGui::SameLine();
-	ImGui::Checkbox("Apply displacement vector", &apply_displacement);
+
+	ImGui::Spacing();
+	ImGui::Spacing();
+	ImGui::Text("End Effector Coordinates (mm)");
+
+	//Get XYZ coordinates seperately
+	ImGui::DragFloat("X", &robot_dest.x, 1.0f, 0.0f, 400.0f);
+	ImGui::DragFloat("Y", &robot_dest.y, 1.0f, 0.0f, 400.0f);
+	ImGui::DragFloat("Z", &robot_dest.z, 1.0f, 0.0f, 400.0f);
+	//Get desired tool angle
+	ImGui::DragFloat("tool angle", &robot_dest.w, 1.0f, -90.0f,90.0f);
+	//Button to reset end effector to home point
+	if (ImGui::Button("Reset to Home")) robot_dest = vec4(robot_home_point, 0);	
+
+
+
+	//Change viewing angles
+	if (ImGui::TreeNode("change viewing angles")) {
+		if (ImGui::Button("Top view")) right_eye_point = vec3(300.0f, 1500.0f, 0.0f);
+		if (ImGui::Button("Side view")) right_eye_point = vec3(100.0f, 100.0f, 1500.0f);
+		if (ImGui::Button("Reset view")) set_cam_def();
+		ImGui::TreePop();
+	}
+	
+	//Show kinematics calculations results
+	if (ImGui::TreeNode("show joint angles")) {
+		ImGui::Text(alpha_str.c_str());
+		ImGui::Text(beta_str.c_str());
+		ImGui::Text(theta_str.c_str());
+		ImGui::Text(theta_0_str.c_str());
+		ImGui::TreePop();
+	}
+
+	//Update robot model limb lengths
+	
+	if (ImGui::TreeNode("change limb lengths")) {
+		
+		//get current lengths
+		vec4 buff_lens = r1.get_limb_lens();
+		static float l1_len = buff_lens.x;
+		static float l2_len = buff_lens.y;
+		static float l3_len = buff_lens.z;
+		static float bs_len = buff_lens.w;
+		
+		//pass to inputs
+		ImGui::InputScalar("L1", ImGuiDataType_Float, &l1_len, &f_incre);
+		ImGui::InputScalar("L2", ImGuiDataType_Float, &l2_len, &f_incre);
+		ImGui::InputScalar("L3", ImGuiDataType_Float, &l3_len, &f_incre);
+		ImGui::InputScalar("Base", ImGuiDataType_Float, &bs_len, &f_incre);
+		
+		//update robot model
+		r1.set_limb_lens(vec4(l1_len, l2_len, l3_len, bs_len));
+
+		//reset lengths to initial length
+		if (ImGui::Button("Reset limb len")) {
+			r1.set_limb_lens(default_lens);
+			l1_len = default_lens.x;
+			l2_len = default_lens.y;
+			l3_len = default_lens.y;
+			bs_len = default_lens.w;
+		}
+		ImGui::TreePop();
+	}
 	
 
+	ImGui::Separator();
+	ImGui::Spacing();
+	ImGui::Spacing();
+	ImGui::Text("Robot-Kinect control");
+	ImGui::DragFloat("sensitivity", &displacement_mult,0.001f, 1.0f,2.0f);
+	ImGui::Checkbox("Apply displacement vector", &apply_displacement);
 	
-	//Starting communication Port
+	ImGui::Separator();
+	ImGui::Spacing();
+	ImGui::Spacing();
+	ImGui::Text("Communications");
+	
+	//Opening and closing of Serial port communication
 	
 	if (!port_opened) {								//Port not yet opened
 		
@@ -263,13 +339,13 @@ void KinectXRobotApp::update()
 
 	ImGui::End();
 
+	//----------------------------START OF DISPLACEMENT PROCESSING / GCODE HANDLING---------------------------------------
 
-
-	//robot displacement to apply to robot model
-	vec4 robot_displacement = vec4(robot_home_point + displacement, 0);
+	//Calculating target displacement to apply to robot model
+	vec4 robot_displacement = vec4(displacement_mult) * vec4(robot_home_point + displacement, 0);
 	gcode_queue.push(robot_displacement);	//queue the displacement
 	
-	//convert coordinate to string
+	//convert coordinates to string
 	string robot_displacement_str = "X" + to_string(robot_displacement.x) + " Y" + to_string(robot_displacement.y) + " Z" + to_string(robot_displacement.z);
 	gcode_string_vector.push_back(robot_displacement_str);
 
@@ -277,6 +353,7 @@ void KinectXRobotApp::update()
 	//also check the queue if it's has more than 3 otherwise points wait
 	if (apply_displacement && gcode_queue.size() > 3) {
 		
+		//Set end effector destination as the newest coordinates in the queue
 		robot_dest = gcode_queue.front() ;
 		gcode_queue.pop();
 
@@ -295,22 +372,17 @@ void KinectXRobotApp::update()
 	//trim queue to ensure that command queue is at appropriate length
 	while (gcode_queue.size() > gcode_queue_len)
 		gcode_queue.pop();
-
-
 	
-
-
-
+	//------Streaming Gcode continously here -------//
 	if (send_gcode) {
-		//send gcode here
-
-		//------Streaming Gcode continously here -------//
+		
 		char gcode_buff[128] = { 0 };
 		sprintf(gcode_buff, "X%f Y%f Z%f",robot_dest.x, robot_dest.y,robot_dest.z);
 		s1.write(gcode_buff);
-
-		//--------------------------------------//
+		
 	}
+	//--------------------------------------//
+	//--------------------------------END OF DISPLACEMENT PROCESSING / GCODE HANDLING---------------------------------------
 
 	//update robot arm destination
 	r1.set_dest(robot_dest);
@@ -361,18 +433,16 @@ void KinectXRobotApp::update()
 	ImGui::Separator();
 
 	//Camera controls for the skeleton renderer window
-	if (ImGui::TreeNode("Skeleton renderer camera controls")) {
+	if (ImGui::TreeNode("Renderer camera controls")) {
+		ImGui::Spacing();
+		ImGui::Spacing();
+		ImGui::Text("Kinect Renderer");
 		ImGui::DragFloat3("Left eye point", &left_eye_point, 0.01f);
 		ImGui::DragFloat3("Left look at", &left_look_at, 0.01f);
 		ImGui::DragFloat("Left farplane", &left_fp, 0.01f);
 		ImGui::DragFloat3("Right eye point", &right_eye_point, 1.0f);
 		ImGui::DragFloat3("Right look at", &right_look_at, 1.0f);
 		ImGui::DragFloat("Right far plane", &right_fp, 1.0f);
-		
-
-		if (ImGui::Button("View orthogonal z=0")) right_eye_point = vec3(300.0f, 1500.0f, 0.0f);
-		if (ImGui::Button("View orthogonal y=0")) right_eye_point = vec3(100.0f, 100.0f, 1500.0f);
-		if (ImGui::Button("Reset Defaults")) set_cam_def();
 		ImGui::TreePop();
 	}
 	
@@ -390,7 +460,7 @@ void KinectXRobotApp::update()
 	right_cam.setFarClip(right_fp);
 	
 
-	//ImGui::ShowDemoWindow();
+	ImGui::ShowDemoWindow();
 	
 }
 
@@ -733,6 +803,10 @@ void KinectXRobotApp::cleanup() {
 		CloseHandle(Skel_dready);	//Close handle
 		OutputDebugStringA("Kinect cleaned up\n");
 	}
+
+	//Close port if opened
+	if (port_opened == true)
+		s1.close();
 }
 
 

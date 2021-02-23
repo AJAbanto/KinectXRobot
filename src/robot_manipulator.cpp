@@ -91,6 +91,9 @@ void robot_manipulator::init(vec3 base_pos, float limb_lens[3] , float limb_rads
 }
 
 
+vec4 robot_manipulator::get_limb_lens() {
+    return vec4(this->l1_len, this->l2_len, this->l3_len, this->base_sz);
+}
 
 vec3 robot_manipulator::get_base_pos()
 {
@@ -138,6 +141,40 @@ void robot_manipulator::display_info()
 
 }
 
+void robot_manipulator::set_limb_lens(vec4 lens) {
+    //update limb lens
+    this->l1_len = lens.x;
+    this->l2_len = lens.y;
+    this->l3_len = lens.z;
+    this->base_sz = lens.w;
+
+    //update model geometry
+    auto link1 = geom::Cylinder();
+    link1.height(this->l1_len);
+    link1.radius(this->l1_rad);
+
+    auto link2 = geom::Cylinder();
+    link2.height(this->l2_len);
+    link2.radius(this->l2_rad);
+
+    auto link3 = geom::Cylinder();
+    link3.height(this->l3_len);
+    link3.radius(this->l3_rad);
+
+    auto joint_sphere = geom::Sphere();
+    joint_sphere.radius(joint_sz);
+
+    auto base_cube = geom::Cube();
+    base_cube.size(vec3(base_sz));
+
+    //push geometry into batch container
+    model[0] = gl::Batch::create(base_cube, shader);
+    model[1] = gl::Batch::create(joint_sphere, shader);
+    model[2] = gl::Batch::create(link1, shader);
+    model[3] = gl::Batch::create(link2, shader);
+    model[4] = gl::Batch::create(link3, shader);
+}
+
 void robot_manipulator::set_dest(vec4 dest)
 {
     //update end effector position to be destination set
@@ -177,12 +214,16 @@ void robot_manipulator::draw()
     float cf_head_len = 10.0f;
     float cf_head_rad = 5.0f;
    
+    
+    //translate to base render position
+    gl::translate(base_pos);
+
+    //translate up 1/2 the base length since cubes are drawn from the center
+    gl::translate(vec3(0, base_sz / 2, 0));
+
     gl::color(Color(1, 1, 1));
 
     gl::drawCoordinateFrame(cf_len, cf_head_len, cf_head_rad);      //draw some unit vectors for referrence
-
-    //translate to base render position
-    gl::translate(base_pos);
     
     model[0]->draw();                             //base cube
     gl::translate(vec3(0, base_sz/2, 0));

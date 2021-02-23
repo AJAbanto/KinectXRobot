@@ -18,12 +18,14 @@ class robot_manipulator
 		robot_manipulator();	//default constructor
 		void init(vec3 base_pos, float limb_lens[3], float limb_rads[3], float joint_sz);	//reset/re-initialize parameters
 		
-		vec3 get_base_pos();// returns (x , y , z)
-		vec4 get_end_pos(); // returns (x , y , z , gamma)
-		vec4 get_angles();  // returns (a , b , th ,th0)
+		vec3 get_base_pos();			// returns (x , y , z)
+		vec4 get_end_pos();				// returns (x , y , z , gamma)
+		vec4 get_angles();				// returns (a , b , th ,th0)
+		vec4 get_limb_lens();			// returns (l1 , l2 , l3 , base_height)
 
-		void display_info();	  //display robot controls
-		void set_dest(vec4 dest); // accepts (x , y , z , gamma)
+		void display_info();			// display robot controls
+		void set_dest(vec4 dest);		// sets end effector coordinates accepts (x , y , z , gamma)
+		void set_limb_lens(vec4 lens);	// sets limb lengths accepts (l1, l2, l3 , base_height ) 
 		
 		void draw();
 	private:

@@ -22,6 +22,7 @@ class robot_manipulator
 		vec4 get_end_pos();				// returns (x , y , z , gamma)
 		vec4 get_angles();				// returns (a , b , th ,th0)
 		vec4 get_limb_lens();			// returns (l1 , l2 , l3 , base_height)
+		float get_tot_len();			// returns tot_len
 
 		void display_info();			// display robot controls
 		void set_dest(vec4 dest);		// sets end effector coordinates accepts (x , y , z , gamma)
@@ -65,6 +66,5 @@ class robot_manipulator
 		
 
 		vec4 calcIK(vec4 dest);	//calculate Inverse kinematics returns (alpha,beta,theta,theta_0)
-		bool move_angles(); //updates actual angles
 };
 

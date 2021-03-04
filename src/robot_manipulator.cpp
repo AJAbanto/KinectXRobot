@@ -95,6 +95,13 @@ vec4 robot_manipulator::get_limb_lens() {
     return vec4(this->l1_len, this->l2_len, this->l3_len, this->base_sz);
 }
 
+float robot_manipulator::get_tot_len()
+{
+    //update tot_len
+    this->tot_len = this->l1_len + this->l2_len + this->l3_len + this->base_sz;
+    return this->tot_len;
+}
+
 vec3 robot_manipulator::get_base_pos()
 {
     return base_pos;

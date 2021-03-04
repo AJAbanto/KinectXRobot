@@ -206,10 +206,13 @@ void KinectXRobotApp::update()
 	ImGui::Spacing();
 	ImGui::Text("End Effector Coordinates (mm)");
 
+	//Get max coordinates from current robot model
+	float u_bound = r1.get_tot_len();
+
 	//Get XYZ coordinates seperately
-	ImGui::DragFloat("X", &robot_dest.x, 1.0f, 0.0f, 400.0f);
-	ImGui::DragFloat("Y", &robot_dest.y, 1.0f, 0.0f, 400.0f);
-	ImGui::DragFloat("Z", &robot_dest.z, 1.0f, 0.0f, 400.0f);
+	ImGui::DragFloat("X", &robot_dest.x, 1.0f, 0.0f, u_bound);
+	ImGui::DragFloat("Y", &robot_dest.y, 1.0f, 0.0f, u_bound);
+	ImGui::DragFloat("Z", &robot_dest.z, 1.0f, 0.0f, u_bound);
 	//Get desired tool angle
 	ImGui::DragFloat("tool angle", &robot_dest.w, 1.0f, -90.0f,90.0f);
 	//Button to reset end effector to home point
@@ -259,7 +262,7 @@ void KinectXRobotApp::update()
 			r1.set_limb_lens(default_lens);
 			l1_len = default_lens.x;
 			l2_len = default_lens.y;
-			l3_len = default_lens.y;
+			l3_len = default_lens.z;
 			bs_len = default_lens.w;
 		}
 		ImGui::TreePop();

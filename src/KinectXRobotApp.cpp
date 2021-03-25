@@ -463,7 +463,7 @@ void KinectXRobotApp::update()
 	right_cam.setFarClip(right_fp);
 	
 
-	ImGui::ShowDemoWindow();
+	//ImGui::ShowDemoWindow();
 	
 }
 

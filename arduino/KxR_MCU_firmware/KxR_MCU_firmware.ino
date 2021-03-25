@@ -1,25 +1,32 @@
 #include <gcode.h>
-#include <pin_names.h>
-
-//Notes:
-//Gcode communication library used here can be found at:
-//https://github.com/tinkersprojects/G-Code-Arduino-Library
-
-//Instantiating GCODE streaming
-void homing();
-void clear_lcd();
-commandscallback commands[2] = {{"G33",homing},{"G34",clear_lcd}};
-gcode Commands(2,commands);
-//Variables for coordinates sent via Gcode
-double X,Y,Z;
-
+#include "cnc_shield.h"
 
 void setup() {
-  // put your setup code here, to run once:
-
+  setup_pins();
+  reset_angles();
+  Commands.begin((unsigned long) 9600); //initiate gcode communication
+  Serial.println("Ready");
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  
+  if(Commands.available()){
 
+    //Manual Writing steppers
+    if(Commands.availableValue('X')){
+      int angleX = Commands.GetValue('X');
+      write_X_stepper(angleX);
+    }
+    
+    if(Commands.availableValue('Y')){
+      int angleY = Commands.GetValue('Y');
+      write_Y_stepper(angleY);
+    }
+    
+    if(Commands.availableValue('Z')){
+      int angleZ = Commands.GetValue('Z');
+      write_Z_stepper(angleZ);
+    }
+    
+  }
 }

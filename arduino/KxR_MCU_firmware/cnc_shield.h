@@ -15,7 +15,7 @@
 
 //Gear box input to output ratio (1:36 and 1:6)
 #define X_GEAR_MULTIPLIER 36
-#define Y_GEAR_MULTIPLIER 6
+#define Y_GEAR_MULTIPLIER 36
 #define Z_GEAR_MULTIPLIER 36
 
 #define X_DEGREE_PER_STEP 1.8
@@ -56,6 +56,41 @@ void setup_pins(){
 
 
 //GCODE Commands
+
+void write_Y_90accel(){
+  int delays[1800];
+  int STEPS = 1800;
+  float c0 = 1500;
+  float cn = c0;
+  int cn_min = 100;
+
+  digitalWrite(Y_DIR,HIGH);
+
+  for(int i = 0; i < 1800; i++)
+    Serial.println(i);
+  /*
+  //calculate delays
+  for(int i = 0; i < STEPS ; i++){
+
+    if( i > 0) cn = cn - ((2 * cn)/((4*i) + 1));
+    if( cn < cn_min) cn = cn_min;
+    delays[i] = cn;
+    if(i < STEPS)Serial.println(i);
+    if(i >= STEPS)("Done calculating");
+  }
+  // use delays from the array, forward
+  for (int i = 0; i < STEPS; i++) {
+    digitalWrite(Y_STEP, HIGH);
+    delayMicroseconds( STEP_PULSE_DELAY );
+    digitalWrite(Y_STEP, LOW);
+    delayMicroseconds( delays[i] );
+  }
+  */
+
+  Serial.println("Done");
+}
+
+
 
 //Function to write specific angle manually to Z stepper motor
 void write_Z_stepper(int angle){

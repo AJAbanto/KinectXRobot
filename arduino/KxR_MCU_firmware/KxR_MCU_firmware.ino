@@ -19,8 +19,9 @@ void loop() {
     }
     
     if(Commands.availableValue('Y')){
-      int angleY = Commands.GetValue('Y');
-      write_Y_stepper(angleY);
+      //int angleY = Commands.GetValue('Y');
+      //write_Y_stepper(angleY);
+      write_Y_90accel();
     }
     
     if(Commands.availableValue('Z')){

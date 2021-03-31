@@ -19,25 +19,25 @@ class SerialPort
         COMMTIMEOUTS timeouts;  //timeouts structure
         DWORD BytesWritten;          // No of bytes written to the port
         DWORD dwEventMask;     // Event mask to trigger
-        char  ReadData;        //temperory Character
         DWORD NoBytesRead;     // Bytes read by ReadFile()
-        unsigned char loop;
+
 
         //wide character type
         wchar_t PortNo[20]; //contain friendly name
 
     public:
         SerialPort();               //default constructor (does not open port yet)
+        char  ReadData[1000];        //Buffer for data read
         int open(char * portname);  //fxn to open user specified port
-        void write(char * buff);     //fxn to write to port
-        void close();                //fxn to close port
+        void write(char * buff);    //fxn to write to port
+        void write_gcode(char* buff); //fxn to write gcode to arduino mega Note: this waits for a reply
+        void close();               //fxn to close port
 
 };
 
 SerialPort::SerialPort() {
     //initializes things
     this->BytesWritten = 0;          // No of bytes written to the port
-    this->loop = 0;                  // read loop
     this->dcbSerialParams = { 0 };   // dcb struct for timeouts
 
     //initializes buffers
@@ -60,7 +60,7 @@ int SerialPort::open(char * port_name) {
         0,                                 // No Sharing, ports cant be shared
         NULL,                              // No Security
         OPEN_EXISTING,                     // Open existing port only
-        0,                                 // Non Overlapped I/O
+        0,              // Orginally Non Overlapped I/O but changed
         NULL);                             // Null for Comm Devices
 
 
@@ -80,7 +80,7 @@ int SerialPort::open(char * port_name) {
     }
 
     
-    dcbSerialParams.BaudRate = CBR_9600;      //BaudRate = 9600
+    dcbSerialParams.BaudRate = CBR_115200;      //BaudRate = 9600
     dcbSerialParams.ByteSize = 8;             //ByteSize = 8
     dcbSerialParams.StopBits = ONESTOPBIT;    //StopBits = 1
     dcbSerialParams.Parity = NOPARITY;      //Parity = None
@@ -103,7 +103,9 @@ int SerialPort::open(char * port_name) {
         OutputDebugStringA("\nError in setting time outs\n\n");
         return -1;
     }
+    
 
+    
     OutputDebugStringA("\nOpening port success\n");
     return 0;
 }
@@ -111,7 +113,7 @@ int SerialPort::open(char * port_name) {
 void SerialPort::write(char* buff) {
     
     char SerialBuffer[128] = { 0 };     
-    sprintf(SerialBuffer, "%s\n", buff);
+    sprintf(SerialBuffer, "\r\n%s\r\n", buff);
 
     Status = WriteFile(this->hPort,// Handle to the Serialport
         SerialBuffer,            // Data to be written to the port
@@ -119,6 +121,9 @@ void SerialPort::write(char* buff) {
         &BytesWritten,          // No of bytes written to the port
         NULL);
 }
+
+
+
 void SerialPort::close() {
     CloseHandle(this->hPort);
 }

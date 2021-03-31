@@ -1,9 +1,9 @@
-#include <gcode.h>
-#include "cnc_shield.h"
 
+
+#include <gcode.h>
+#include "ramps.h"
 void setup() {
   setup_pins();
-  reset_angles();
   Commands.begin((unsigned long) 9600); //initiate gcode communication
   Serial.println("Ready");
 }

@@ -4,6 +4,7 @@
 #include "cinder/CinderImGui.h"
 
 #include <Windows.h>
+#include <synchapi.h>
 #include <iostream>
 #include <string>
 #include <queue>
@@ -71,6 +72,12 @@ class KinectXRobotApp : public App {
 	bool port_opened;			//port status bool
 	int gcode_queue_len;		//queue length
 	bool send_gcode;			//serial communication flag
+
+	//gcode streaming testing tools
+	const int S32_incre = 50.0f;
+	int x_temp;
+	int x_temp_old;
+	char gcode_buff[32];	//gcode container before streaming
 
 	//Start of Kinect stuff
 	//Flags and handlers
@@ -158,7 +165,7 @@ void KinectXRobotApp::setup()
 
 	//initialize robot model position to home point
 	
-	robot_home_point = vec3(250, 250, 0);		//x=250, y=250, z=0;
+	robot_home_point = vec3(420, 320, 0);		//x=250, y=250, z=0;
 	robot_dest = vec4(robot_home_point, 0);		//home point , gamma = 0;
 
 	//record initial robot limb lengths
@@ -172,6 +179,11 @@ void KinectXRobotApp::setup()
 	port_opened = false;
 	send_gcode = false;
 	s1 = SerialPort();						   //intantiate port object
+
+	//initialize gcode stuff
+	memset(gcode_buff, 0, sizeof(gcode_buff));
+	x_temp = 0;
+	x_temp_old = x_temp;
 
 	//initiate kinect device communication
 	this->hr = init_kinect();
@@ -294,7 +306,7 @@ void KinectXRobotApp::update()
 			if (s1.open(buff) == -1) ImGui::OpenPopup("Error COM port");	//throw error and prepare error modal window
 			else {
 				port_opened = true;										//else raise flag to indicate port is opened
-				s1.write("Starting Transmission;");
+				memset(buff, 0, sizeof(buff));							//clear textbox after opening
 			}
 		}
 		//if failed to open port show error modal window
@@ -308,8 +320,29 @@ void KinectXRobotApp::update()
 
 		
 		
+		
 		if (send_gcode == true) {
 			ImGui::Text("STREAMING GCODE..");
+
+			/*
+			ImGui::InputScalar("X_temp",ImGuiDataType_S32, &x_temp, &S32_incre);
+			sprintf(gcode_buff, "G0X%d", x_temp);
+			if (x_temp != x_temp_old) {
+				s1.write(gcode_buff);
+				x_temp_old = x_temp;
+			}
+			*/
+			
+			
+			if ((displacement.x > -30 && displacement.x < 30) && (displacement.x >= x_temp_old + 2 || displacement.x <= x_temp_old - 2)) {
+				x_temp_old =  displacement_mult * displacement.x;
+				sprintf(gcode_buff, "G0X%d", x_temp_old * 2);
+				s1.write(gcode_buff);
+			}else sprintf(gcode_buff, "G0X%d", x_temp_old);
+			
+			ImGui::Text(gcode_buff);
+			memset(gcode_buff, 0, sizeof(gcode_buff));
+
 			if (ImGui::Button("Stop gcode stream")) send_gcode = false;
 		}
 		else {
@@ -318,11 +351,22 @@ void KinectXRobotApp::update()
 			//Note:
 			//Each serial message will be sent after appending a newline character at the end of the gcode command string
 			static char writebuff[32] = "";
-			ImGui::InputText("gcode command", writebuff, 32, 0);
+			ImGui::InputText("gcode command", writebuff, 32, ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsNoBlank);
 			ImGui::SameLine();
+			
 			if (ImGui::Button("send")) {
 				s1.write(writebuff);
+				memset(writebuff, 0, sizeof(writebuff));
 			}
+
+			//Some discreet robot commands in a hidable tree
+			if (ImGui::TreeNode("GCODE commands")) {
+				if (ImGui::Button("Enable Steppers")) s1.write("M17");
+				ImGui::SameLine();
+				if (ImGui::Button("Disable Steppers")) s1.write("M18");
+				ImGui::TreePop();
+			}
+
 
 			if (ImGui::Button("Start gcode stream")) send_gcode = true;
 
@@ -377,6 +421,7 @@ void KinectXRobotApp::update()
 		gcode_queue.pop();
 	
 	//------Streaming Gcode continously here -------//
+	/*
 	if (send_gcode) {
 		
 		char gcode_buff[128] = { 0 };
@@ -384,6 +429,7 @@ void KinectXRobotApp::update()
 		s1.write(gcode_buff);
 		
 	}
+	*/
 	//--------------------------------------//
 	//--------------------------------END OF DISPLACEMENT PROCESSING / GCODE HANDLING---------------------------------------
 
@@ -411,7 +457,7 @@ void KinectXRobotApp::update()
 	tracking_targets.push_back("Right foot");
 
 	//Displacement vector info
-	string displacement_str = "Displacement: (" + std::to_string(displacement.x) + " , " + std::to_string(displacement.y) + " , "
+	string displacement_str = "Displacement: (X" + std::to_string(displacement.x) + " ,Y " + std::to_string(displacement.y) + " ,Z "
 		+ std::to_string(displacement.z) + " )";
 
 	//Faux origin vector info
@@ -751,7 +797,7 @@ void KinectXRobotApp::draw_skeleton() {
 			tracked_pos = left_hand_pos;
 		}
 
-		float scalar = 100.0f;	//convert to cm from m
+		float scalar = 100.0f;	//convert from m to cm
 		vec3 target_pos = vec3(tracked_pos.x * scalar, tracked_pos.y * scalar , tracked_pos.z * scalar);
 		
 
@@ -762,7 +808,10 @@ void KinectXRobotApp::draw_skeleton() {
 		gl::color(Color(1, 1, 1));
 
 		//calculate and record displacement to be applied to robot
-		if(apply_displacement) displacement = target_pos - faux_origin;	
+		if (apply_displacement) {
+			displacement = target_pos - faux_origin;
+		}
+		
 	}
 	//Draw bones here
 

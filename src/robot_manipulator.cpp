@@ -13,8 +13,8 @@ robot_manipulator::robot_manipulator() {
     //note all measurements are in milimeters
     float def_jsz = 50.0f;
     float def_base_sz = 150.0f;
-    this->l1_len = 300.0f;
-    this->l2_len = 200.0f;
+    this->l1_len = 320.0f;
+    this->l2_len = 320.0f;
     this->l3_len = 100.0f;
     this->l1_rad = 45.0f;
     this->l2_rad = 40.0f;

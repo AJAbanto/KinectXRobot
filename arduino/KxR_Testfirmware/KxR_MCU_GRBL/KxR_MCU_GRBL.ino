@@ -1,5 +1,5 @@
 #include <gcode.h>
-#include "cnc_shield.h"
+#include "grbl.h"
 
 void setup() {
   setup_pins();

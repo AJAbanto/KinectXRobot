@@ -34,7 +34,7 @@
 #define Z_STEPPING_MODE 16
 
 //Pulse width (in microseconds) for a step using A4988 drivers
-#define STEP_PULSE_DELAY 50
+#define STEP_PULSE_DELAY 70
 
 
 #define DELAY_BETWEEN_PULSE false

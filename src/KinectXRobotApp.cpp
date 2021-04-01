@@ -75,9 +75,11 @@ class KinectXRobotApp : public App {
 
 	//gcode streaming testing tools
 	const int S32_incre = 50.0f;
-	int x_temp;
+	int x_temp;				//filtering tools
 	int x_temp_old;
+	int x_speed;			//speed up tool
 	char gcode_buff[32];	//gcode container before streaming
+	bool apply_xspeed;		//speed testing
 
 	//Start of Kinect stuff
 	//Flags and handlers
@@ -184,6 +186,8 @@ void KinectXRobotApp::setup()
 	memset(gcode_buff, 0, sizeof(gcode_buff));
 	x_temp = 0;
 	x_temp_old = x_temp;
+	apply_xspeed = false;
+	x_speed = 0;
 
 	//initiate kinect device communication
 	this->hr = init_kinect();
@@ -324,6 +328,7 @@ void KinectXRobotApp::update()
 		if (send_gcode == true) {
 			ImGui::Text("STREAMING GCODE..");
 
+			//Uncomment this section for testing gcode transmition using absolute mode
 			/*
 			ImGui::InputScalar("X_temp",ImGuiDataType_S32, &x_temp, &S32_incre);
 			sprintf(gcode_buff, "G0X%d", x_temp);
@@ -333,12 +338,22 @@ void KinectXRobotApp::update()
 			}
 			*/
 			
+			//enable and disable F-speed command in gcode
+			ImGui::Checkbox("Apply F-speed (X-Axis)", &apply_xspeed);
+			if(apply_xspeed) ImGui::InputScalar("F-speed", ImGuiDataType_S32, &x_speed, &S32_incre);
 			
 			if ((displacement.x > -30 && displacement.x < 30) && (displacement.x >= x_temp_old + 2 || displacement.x <= x_temp_old - 2)) {
 				x_temp_old =  displacement_mult * displacement.x;
-				sprintf(gcode_buff, "G0X%d", x_temp_old * 2);
+				//Apply base speed
+				if (apply_xspeed) sprintf(gcode_buff, "G1X%dF%d", x_temp_old * 2, x_speed);
+				else  sprintf(gcode_buff, "G1X%d", x_temp_old * 2);
 				s1.write(gcode_buff);
-			}else sprintf(gcode_buff, "G0X%d", x_temp_old);
+			}
+			else {
+				//Apply base speed
+				if (apply_xspeed) sprintf(gcode_buff, "G1X%dF%d", x_temp_old * 2, x_speed);
+				else  sprintf(gcode_buff, "G1X%d", x_temp_old * 2);
+			}
 			
 			ImGui::Text(gcode_buff);
 			memset(gcode_buff, 0, sizeof(gcode_buff));
@@ -349,7 +364,7 @@ void KinectXRobotApp::update()
 
 			//If not streaming gcode , allow user to send discreet gcode commands
 			//Note:
-			//Each serial message will be sent after appending a newline character at the end of the gcode command string
+			//Each serial message will be sent after appending both NL and CR character at the end of the gcode command string
 			static char writebuff[32] = "";
 			ImGui::InputText("gcode command", writebuff, 32, ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsNoBlank);
 			ImGui::SameLine();
@@ -390,49 +405,15 @@ void KinectXRobotApp::update()
 
 	//Calculating target displacement to apply to robot model
 	vec4 robot_displacement = vec4(displacement_mult) * vec4(robot_home_point + displacement, 0);
-	gcode_queue.push(robot_displacement);	//queue the displacement
 	
-	//convert coordinates to string
-	string robot_displacement_str = "X" + to_string(robot_displacement.x) + " Y" + to_string(robot_displacement.y) + " Z" + to_string(robot_displacement.z);
-	gcode_string_vector.push_back(robot_displacement_str);
 
-	//if apply displacement flag is set then update robot using displacement vector
-	//also check the queue if it's has more than 3 otherwise points wait
-	if (apply_displacement && gcode_queue.size() > 3) {
-		
-		//Set end effector destination as the newest coordinates in the queue
-		robot_dest = gcode_queue.front() ;
-		gcode_queue.pop();
-
-
-		//move vector of string list forward
-		if (!gcode_string_vector.empty()) {
-			for (int i = 0; i < gcode_string_vector.size() - 1; i++)
-				gcode_string_vector[i] = gcode_string_vector[i+1];
-		}
-	}
 	
-	//trim vector
-	while (gcode_string_vector.size() > gcode_queue_len)
-		gcode_string_vector.pop_back();
-	
-	//trim queue to ensure that command queue is at appropriate length
-	while (gcode_queue.size() > gcode_queue_len)
-		gcode_queue.pop();
-	
-	//------Streaming Gcode continously here -------//
-	/*
-	if (send_gcode) {
-		
-		char gcode_buff[128] = { 0 };
-		sprintf(gcode_buff, "X%f Y%f Z%f",robot_dest.x, robot_dest.y,robot_dest.z);
-		s1.write(gcode_buff);
-		
-	}
-	*/
-	//--------------------------------------//
 	//--------------------------------END OF DISPLACEMENT PROCESSING / GCODE HANDLING---------------------------------------
 
+	//if apply displacement flag is set then update robot using displacement vector
+	if (apply_displacement) {
+		robot_dest = robot_displacement;
+	}
 	//update robot arm destination
 	r1.set_dest(robot_dest);
 

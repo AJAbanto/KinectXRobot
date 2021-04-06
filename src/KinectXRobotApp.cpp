@@ -75,11 +75,15 @@ class KinectXRobotApp : public App {
 
 	//gcode streaming testing tools
 	const int S32_incre = 50.0f;
-	int x_temp;				//filtering tools
-	int x_temp_old;
-	int x_speed;			//speed up tool
+	const int Origin_incre = 1.0f;
+	
+	int x_temp, y_temp, z_temp;				//Motion capturefiltering tools
+	int x_temp_old, y_temp_old, z_temp_old;
+	float tot_displacement, old_tot_displacement;
+	int x_origin, y_origin, z_origin;		//Initial position of robot
+	int mv_speed;			//speed up tool
 	char gcode_buff[32];	//gcode container before streaming
-	bool apply_xspeed;		//speed testing
+	bool apply_mvspeed;		//speed testing
 
 	//Start of Kinect stuff
 	//Flags and handlers
@@ -167,7 +171,7 @@ void KinectXRobotApp::setup()
 
 	//initialize robot model position to home point
 	
-	robot_home_point = vec3(420, 320, 0);		//x=250, y=250, z=0;
+	robot_home_point = vec3(420, 320, 0);		//x=320, y=320, z=0;
 	robot_dest = vec4(robot_home_point, 0);		//home point , gamma = 0;
 
 	//record initial robot limb lengths
@@ -182,12 +186,27 @@ void KinectXRobotApp::setup()
 	send_gcode = false;
 	s1 = SerialPort();						   //intantiate port object
 
-	//initialize gcode stuff
+	//initialize gcode buff
 	memset(gcode_buff, 0, sizeof(gcode_buff));
+
+	//set initial position of actual robot
+	x_origin = 0;
+	y_origin = 320;
+	z_origin = 320;
+
+	//initialize filtering variables
+	tot_displacement = 0;
+	old_tot_displacement = 0;
 	x_temp = 0;
+	y_temp = 0;
+	z_temp = 0;
+
 	x_temp_old = x_temp;
-	apply_xspeed = false;
-	x_speed = 0;
+	y_temp_old = y_temp;
+	z_temp_old = z_temp;
+
+	apply_mvspeed = false;
+	mv_speed = 0;
 
 	//initiate kinect device communication
 	this->hr = init_kinect();
@@ -328,33 +347,70 @@ void KinectXRobotApp::update()
 		if (send_gcode == true) {
 			ImGui::Text("STREAMING GCODE..");
 
-			//Uncomment this section for testing gcode transmition using absolute mode
-			/*
-			ImGui::InputScalar("X_temp",ImGuiDataType_S32, &x_temp, &S32_incre);
-			sprintf(gcode_buff, "G0X%d", x_temp);
-			if (x_temp != x_temp_old) {
-				s1.write(gcode_buff);
-				x_temp_old = x_temp;
+			//Modify initial position of actual robot and other commands
+			if (ImGui::TreeNode("Additional Options")) {
+
+				ImGui::InputScalar("Initial X pos.", ImGuiDataType_S32, &x_origin, &Origin_incre);
+				ImGui::InputScalar("Initial Y pos.", ImGuiDataType_S32, &y_origin, &Origin_incre);
+				ImGui::InputScalar("Initial Z pos.", ImGuiDataType_S32, &z_origin, &Origin_incre);
+
+				//enable and disable movement speed command in gcode
+				ImGui::Checkbox("Apply mv speed", &apply_mvspeed);
+				if (apply_mvspeed) ImGui::InputScalar("movement speed", ImGuiDataType_S32, &mv_speed, &S32_incre);
+
+				ImGui::TreePop();
 			}
-			*/
 			
-			//enable and disable F-speed command in gcode
-			ImGui::Checkbox("Apply F-speed (X-Axis)", &apply_xspeed);
-			if(apply_xspeed) ImGui::InputScalar("F-speed", ImGuiDataType_S32, &x_speed, &S32_incre);
 			
+			
+			//get total length of displacement vector
+			tot_displacement = sqrt((displacement.x * displacement.x) + (displacement.y * displacement.y) + (displacement.z * displacement.z));
+			
+			
+			if ((tot_displacement > -30 && tot_displacement < 30) && ( tot_displacement >= old_tot_displacement +2) ) {
+
+				if ((displacement.x >= x_temp_old + 2 || displacement.x <= x_temp_old - 2)) {
+					x_temp_old = displacement_mult * displacement.x;
+				}
+
+				if ((displacement.y >= y_temp_old + 2 || displacement.y <= y_temp_old - 2)) {
+					y_temp_old = displacement_mult * displacement.y;
+				}
+
+				if ((displacement.z >= z_temp_old + 2 || displacement.z <= z_temp_old - 2)) {
+					z_temp_old = displacement_mult * displacement.z;
+				}
+
+				//Apply base speed
+				if (apply_mvspeed) sprintf(gcode_buff, "G1X%dY%dZ%dF%d", x_temp_old + x_origin, y_temp_old + y_origin, z_temp_old + z_origin, mv_speed);
+				else  sprintf(gcode_buff, "G1X%dY%dZ%d", x_temp_old, y_temp_old, z_temp_old);
+
+				//send to robot over serial port
+				s1.write(gcode_buff);
+			}
+			else {
+				//Apply base speed
+				if (apply_mvspeed) sprintf(gcode_buff, "G1X%dY%dZ%dF%d", x_temp_old + x_origin, y_temp_old + y_origin, z_temp_old + z_origin, mv_speed);
+				else  sprintf(gcode_buff, "G1X%dY%dZ%d", x_temp_old, y_temp_old, z_temp_old);
+			}
+
+			//update record
+			old_tot_displacement = tot_displacement;
+			/*
+			 //old code focusing only on displacement in the X-axis
 			if ((displacement.x > -30 && displacement.x < 30) && (displacement.x >= x_temp_old + 2 || displacement.x <= x_temp_old - 2)) {
 				x_temp_old =  displacement_mult * displacement.x;
 				//Apply base speed
-				if (apply_xspeed) sprintf(gcode_buff, "G1X%dF%d", x_temp_old * 2, x_speed);
+				if (apply_mvspeed) sprintf(gcode_buff, "G1X%dF%d", x_temp_old * 2, mv_speed);
 				else  sprintf(gcode_buff, "G1X%d", x_temp_old * 2);
 				s1.write(gcode_buff);
 			}
 			else {
 				//Apply base speed
-				if (apply_xspeed) sprintf(gcode_buff, "G1X%dF%d", x_temp_old * 2, x_speed);
+				if (apply_mvspeed) sprintf(gcode_buff, "G1X%dF%d", x_temp_old * 2, x_speed);
 				else  sprintf(gcode_buff, "G1X%d", x_temp_old * 2);
 			}
-			
+			*/
 			ImGui::Text(gcode_buff);
 			memset(gcode_buff, 0, sizeof(gcode_buff));
 

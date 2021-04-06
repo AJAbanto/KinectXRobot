@@ -29,12 +29,12 @@
 #define Z_DEGREE_PER_STEP 1.8
 
 //Either for Fullstep or Microstep (1 or 16 respectively)
-#define X_STEPPING_MODE 16
-#define Y_STEPPING_MODE 16
-#define Z_STEPPING_MODE 16
+#define X_STEPPING_MODE 4
+#define Y_STEPPING_MODE 4
+#define Z_STEPPING_MODE 4
 
 //Pulse width (in microseconds) for a step using A4988 drivers
-#define STEP_PULSE_DELAY 70
+#define STEP_PULSE_DELAY 500
 
 
 #define DELAY_BETWEEN_PULSE false

@@ -368,7 +368,9 @@ void KinectXRobotApp::update()
 			
 			
 			if ((tot_displacement > -30 && tot_displacement < 30) && ( tot_displacement >= old_tot_displacement +2) ) {
+			//if (true) {
 
+				
 				if ((displacement.x >= x_temp_old + 2 || displacement.x <= x_temp_old - 2)) {
 					x_temp_old = displacement_mult * displacement.x;
 				}
@@ -381,17 +383,45 @@ void KinectXRobotApp::update()
 					z_temp_old = displacement_mult * displacement.z;
 				}
 
+				
+				//Adding displacement to current home position
+				int x_dest = x_temp_old + x_origin;
+				int y_dest = y_temp_old + y_origin;
+				int z_dest = z_temp_old + z_origin;
+				
+				//edge cases
+				if (x_dest > 300) x_dest = 300;
+				if (y_dest < 100) y_dest = 100;
+				if (y_dest > 320) y_dest = 320;
+				if (y_dest < 100) y_dest = 100;
+				if (z_dest < 100) z_dest = 100;
+				if (z_dest > 320) z_dest = 320;
+
 				//Apply base speed
-				if (apply_mvspeed) sprintf(gcode_buff, "G1X%dY%dZ%dF%d", x_temp_old + x_origin, y_temp_old + y_origin, z_temp_old + z_origin, mv_speed);
-				else  sprintf(gcode_buff, "G1X%dY%dZ%d", x_temp_old, y_temp_old, z_temp_old);
+				if (apply_mvspeed) sprintf(gcode_buff, "G1X%dY%dZ%dF%d", x_dest, y_dest, z_dest, mv_speed);
+				else  sprintf(gcode_buff, "G1X%dY%dZ%d", x_dest, y_dest, z_dest);
 
 				//send to robot over serial port
 				s1.write(gcode_buff);
 			}
 			else {
+
+				//Adding displacement to current home position
+				int x_dest = x_temp_old + x_origin;
+				int y_dest = y_temp_old + y_origin;
+				int z_dest = z_temp_old + z_origin;
+
+				//edge cases
+				if (x_dest > 300) x_dest = 300;
+				if (y_dest < 100) y_dest = 100;
+				if (y_dest > 320) y_dest = 320;
+				if (y_dest < 100) y_dest = 100;
+				if (z_dest < 100) z_dest = 100;
+				if (z_dest > 320) z_dest = 320;
+
 				//Apply base speed
-				if (apply_mvspeed) sprintf(gcode_buff, "G1X%dY%dZ%dF%d", x_temp_old + x_origin, y_temp_old + y_origin, z_temp_old + z_origin, mv_speed);
-				else  sprintf(gcode_buff, "G1X%dY%dZ%d", x_temp_old, y_temp_old, z_temp_old);
+				if (apply_mvspeed) sprintf(gcode_buff, "G1X%dY%dZ%dF%d", x_dest, y_dest, z_dest, mv_speed);
+				else  sprintf(gcode_buff, "G1X%dY%dZ%d", x_dest, y_dest, z_dest);
 			}
 
 			//update record

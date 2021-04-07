@@ -84,6 +84,7 @@ class KinectXRobotApp : public App {
 	int mv_speed;			//speed up tool
 	char gcode_buff[32];	//gcode container before streaming
 	bool apply_mvspeed;		//speed testing
+	int loops_since_send;   //loop tracker to space out between sends
 
 	//Start of Kinect stuff
 	//Flags and handlers
@@ -207,6 +208,7 @@ void KinectXRobotApp::setup()
 
 	apply_mvspeed = false;
 	mv_speed = 0;
+	loops_since_send = 0;
 
 	//initiate kinect device communication
 	this->hr = init_kinect();
@@ -361,86 +363,70 @@ void KinectXRobotApp::update()
 				ImGui::TreePop();
 			}
 			
-			
-			
+			//Int to track how many coordinate values have changed
+			int coordinates_changed = 0;
+			int displacement_filter = 30;
+			int sample_threshold = 3;
 			//get total length of displacement vector
 			tot_displacement = sqrt((displacement.x * displacement.x) + (displacement.y * displacement.y) + (displacement.z * displacement.z));
 			
+			//Only record displacement if:
+			//----displacement is less than DISPLACEMENT_FILTER units long
+			//----new displacement has a delta of atleast SAMPLE_THRESHOLD from the previous displacement value
+	
+			if ((displacement.x < displacement_filter && displacement.x > -displacement_filter) &&
+				((displacement.x >= x_temp_old + sample_threshold)  || (displacement.x <= x_temp_old - sample_threshold))) {
+				x_temp_old = displacement_mult * displacement.x;
+				coordinates_changed++;
+			}
+
+			if ((displacement.y < displacement_filter && displacement.y > -displacement_filter) && 
+				((displacement.y >= y_temp_old + sample_threshold) || (displacement.y <= y_temp_old - sample_threshold))) {
+				y_temp_old = displacement_mult * displacement.y;
+				coordinates_changed++;
+			}
+
+			if ((displacement.z < displacement_filter && displacement.z > -displacement_filter) &&
+				( (displacement.z >= z_temp_old + sample_threshold) || (displacement.z <= z_temp_old - sample_threshold) )) {
+				z_temp_old = displacement_mult * displacement.z;
+				coordinates_changed++;
+			}
+
+
+			//Adding displacement to current home position
+			int x_dest = x_temp_old + x_origin;
+			int y_dest = y_temp_old + y_origin;
+			int z_dest = z_temp_old + z_origin;
+
+			//--------Coordinate edge cases-----
+			//minimum and maximum X coordinates
+			if (x_dest > 300) x_dest = 300;
+			if (x_dest < -300) x_dest = -300;
+			//minimum and maximum Y coordinates
+			if (y_dest < 250) y_dest = 320;
+			if (y_dest > 500) y_dest = 500;
+			//minimum and maximum Z coordinates
+			if (z_dest < 100) z_dest = 100;
+			if (z_dest > 320) z_dest = 320;
+
+			//Apply base speed
+			if (apply_mvspeed) sprintf(gcode_buff, "G1X%dY%dZ%dF%d", x_dest, y_dest, z_dest, mv_speed);
+			else  sprintf(gcode_buff, "G1X%dY%dZ%d", x_dest, y_dest, z_dest);
+
+			//send to robot over serial port if more than 1 coordinate has been updated
+			//after sending set a timer
+			if (coordinates_changed >= 1 && loops_since_send == 0) {
+				s1.write(gcode_buff); 
+				loops_since_send = 30;
+			}
 			
-			if ((tot_displacement > -30 && tot_displacement < 30) && ( tot_displacement >= old_tot_displacement +2) ) {
-			//if (true) {
-
-				
-				if ((displacement.x >= x_temp_old + 2 || displacement.x <= x_temp_old - 2)) {
-					x_temp_old = displacement_mult * displacement.x;
-				}
-
-				if ((displacement.y >= y_temp_old + 2 || displacement.y <= y_temp_old - 2)) {
-					y_temp_old = displacement_mult * displacement.y;
-				}
-
-				if ((displacement.z >= z_temp_old + 2 || displacement.z <= z_temp_old - 2)) {
-					z_temp_old = displacement_mult * displacement.z;
-				}
-
-				
-				//Adding displacement to current home position
-				int x_dest = x_temp_old + x_origin;
-				int y_dest = y_temp_old + y_origin;
-				int z_dest = z_temp_old + z_origin;
-				
-				//edge cases
-				if (x_dest > 300) x_dest = 300;
-				if (y_dest < 100) y_dest = 100;
-				if (y_dest > 320) y_dest = 320;
-				if (y_dest < 100) y_dest = 100;
-				if (z_dest < 100) z_dest = 100;
-				if (z_dest > 320) z_dest = 320;
-
-				//Apply base speed
-				if (apply_mvspeed) sprintf(gcode_buff, "G1X%dY%dZ%dF%d", x_dest, y_dest, z_dest, mv_speed);
-				else  sprintf(gcode_buff, "G1X%dY%dZ%d", x_dest, y_dest, z_dest);
-
-				//send to robot over serial port
-				s1.write(gcode_buff);
-			}
-			else {
-
-				//Adding displacement to current home position
-				int x_dest = x_temp_old + x_origin;
-				int y_dest = y_temp_old + y_origin;
-				int z_dest = z_temp_old + z_origin;
-
-				//edge cases
-				if (x_dest > 300) x_dest = 300;
-				if (y_dest < 100) y_dest = 100;
-				if (y_dest > 320) y_dest = 320;
-				if (y_dest < 100) y_dest = 100;
-				if (z_dest < 100) z_dest = 100;
-				if (z_dest > 320) z_dest = 320;
-
-				//Apply base speed
-				if (apply_mvspeed) sprintf(gcode_buff, "G1X%dY%dZ%dF%d", x_dest, y_dest, z_dest, mv_speed);
-				else  sprintf(gcode_buff, "G1X%dY%dZ%d", x_dest, y_dest, z_dest);
-			}
+			//decriment timer till next viable gcode send
+			if (loops_since_send > 0) loops_since_send -= 1;
+			else loops_since_send = 0;
 
 			//update record
 			old_tot_displacement = tot_displacement;
-			/*
-			 //old code focusing only on displacement in the X-axis
-			if ((displacement.x > -30 && displacement.x < 30) && (displacement.x >= x_temp_old + 2 || displacement.x <= x_temp_old - 2)) {
-				x_temp_old =  displacement_mult * displacement.x;
-				//Apply base speed
-				if (apply_mvspeed) sprintf(gcode_buff, "G1X%dF%d", x_temp_old * 2, mv_speed);
-				else  sprintf(gcode_buff, "G1X%d", x_temp_old * 2);
-				s1.write(gcode_buff);
-			}
-			else {
-				//Apply base speed
-				if (apply_mvspeed) sprintf(gcode_buff, "G1X%dF%d", x_temp_old * 2, x_speed);
-				else  sprintf(gcode_buff, "G1X%d", x_temp_old * 2);
-			}
-			*/
+			
 			ImGui::Text(gcode_buff);
 			memset(gcode_buff, 0, sizeof(gcode_buff));
 
@@ -452,7 +438,7 @@ void KinectXRobotApp::update()
 			//Note:
 			//Each serial message will be sent after appending both NL and CR character at the end of the gcode command string
 			static char writebuff[32] = "";
-			ImGui::InputText("gcode command", writebuff, 32, ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsNoBlank);
+			ImGui::InputText("gcode command", writebuff, 32, ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsNoBlank );
 			ImGui::SameLine();
 			
 			if (ImGui::Button("send")) {

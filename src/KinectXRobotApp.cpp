@@ -365,8 +365,8 @@ void KinectXRobotApp::update()
 			
 			//Int to track how many coordinate values have changed
 			int coordinates_changed = 0;
-			int displacement_filter = 30;
-			int sample_threshold = 3;
+			int displacement_filter = 40;
+			int sample_threshold = 2;
 			//get total length of displacement vector
 			tot_displacement = sqrt((displacement.x * displacement.x) + (displacement.y * displacement.y) + (displacement.z * displacement.z));
 			
@@ -393,10 +393,10 @@ void KinectXRobotApp::update()
 			}
 
 
-			//Adding displacement to current home position
-			int x_dest = x_temp_old + x_origin;
-			int y_dest = y_temp_old + y_origin;
-			int z_dest = z_temp_old + z_origin;
+			//Adding displacement to current home position (multiplying displacement with a constant)
+			int x_dest = (x_temp_old * 4) + x_origin;
+			int y_dest = (y_temp_old * 2) + y_origin;
+			int z_dest = (z_temp_old  * 2)+ z_origin;
 
 			//--------Coordinate edge cases-----
 			//minimum and maximum X coordinates
@@ -417,7 +417,7 @@ void KinectXRobotApp::update()
 			//after sending set a timer
 			if (coordinates_changed >= 1 && loops_since_send == 0) {
 				s1.write(gcode_buff); 
-				loops_since_send = 30;
+				loops_since_send = 10;
 			}
 			
 			//decriment timer till next viable gcode send

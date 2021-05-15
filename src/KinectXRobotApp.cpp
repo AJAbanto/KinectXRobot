@@ -69,9 +69,12 @@ class KinectXRobotApp : public App {
 	vector <string> gcode_string_vector;	//vector of strings of points in the queue
 
 	SerialPort s1;
-	bool port_opened;			//port status bool
+	SerialPort s2;
+	bool port_opened;			//port1 status bool
+	bool port_opened2;			//port2 status bool
 	int gcode_queue_len;		//queue length
-	bool send_gcode;			//serial communication flag
+	bool send_gcode;			//serial communication flag for port 1
+	bool send_gcode2;			//serial communication flag for port 2
 
 	//gcode streaming testing tools
 	const int S32_incre = 50.0f;
@@ -82,9 +85,11 @@ class KinectXRobotApp : public App {
 	float tot_displacement, old_tot_displacement;
 	int x_origin, y_origin, z_origin;		//Initial position of robot
 	int mv_speed;			//speed up tool
-	char gcode_buff[32];	//gcode container before streaming
+	char gcode_buff[32];	//gcode container before streaming for port 1
+	char gcode_buff2[32];	//gcode container before streaming for port 2
 	bool apply_mvspeed;		//speed testing
-	int loops_since_send;   //loop tracker to space out between sends
+	int loops_since_send;   //loop tracker to space out between sends for port 1
+	int loops_since_send2;   //loop tracker to space out between sends for port 2
 
 	//Start of Kinect stuff
 	//Flags and handlers
@@ -184,11 +189,16 @@ void KinectXRobotApp::setup()
 	//initialize serial port status
 	gcode_queue_len = 10;						//store 10 points at a time
 	port_opened = false;
-	send_gcode = false;
-	s1 = SerialPort();						   //intantiate port object
+	port_opened2 = false;
 
-	//initialize gcode buff
+	send_gcode = false;
+	send_gcode2 = false;
+	s1 = SerialPort();						   //intantiate port object
+	s2 = SerialPort();
+
+	//initialize gcode buff for both ports
 	memset(gcode_buff, 0, sizeof(gcode_buff));
+	memset(gcode_buff2, 0, sizeof(gcode_buff2));
 
 	//set initial position of actual robot
 	x_origin = 0;
@@ -209,6 +219,7 @@ void KinectXRobotApp::setup()
 	apply_mvspeed = false;
 	mv_speed = 0;
 	loops_since_send = 0;
+	loops_since_send2 = 0;
 
 	//initiate kinect device communication
 	this->hr = init_kinect();
@@ -318,7 +329,8 @@ void KinectXRobotApp::update()
 	ImGui::Spacing();
 	ImGui::Text("Communications");
 	
-	//Opening and closing of Serial port communication
+	//---------------------------ROBOT ARM CONNECTED TO COM PORT 1----------------------------------
+	//Opening and closing of Serial port1 communication
 	
 	if (!port_opened) {								//Port not yet opened
 		
@@ -467,8 +479,186 @@ void KinectXRobotApp::update()
 
 		
 	}
+	//---------------------------END OF ROBOT ARM CONNECTED TO COM PORT 1-----------------------------
+	
+	//---------------------------ROBOT ARM CONNECTED TO COM PORT 2----------------------------------
+	//Opening and closing of Serial port2 communication
+	//NOTE: Some features available with port1 will not be available with port 2
+
+	if (!port_opened2) {								//Port not yet opened
+
+		static char buff2[32] = "";
+		ImGui::InputText("port2", buff2, 32, ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsNoBlank);
+
+		//Attempt to open port
+		if (ImGui::Button("Open port2\n")) {
+
+			if (s2.open(buff2) == -1) ImGui::OpenPopup("Error COM port2");	//throw error and prepare error modal window
+			else {
+				port_opened2 = true;										//else raise flag to indicate port is opened
+				memset(buff2, 0, sizeof(buff2));							//clear textbox after opening
+			}
+		}
+		//if failed to open port show error modal window
+		if (ImGui::BeginPopupModal("Error COM port2", NULL, 0)) {
+			ImGui::Text("Could not open port2. Please try again");
+			if (ImGui::Button("close port2"))
+				ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
+	}
+	else {
+
+
+
+
+		if (send_gcode2 == true) {
+			ImGui::Text("STREAMING GCODE..");
+
+
+			//NOTES: Removed option to change origin coordinates
+			/*
+			//Modify initial position of actual robot and other commands
+			if (ImGui::TreeNode("Additional Options")) {
+
+				ImGui::InputScalar("Initial X pos.", ImGuiDataType_S32, &x_origin, &Origin_incre);
+				ImGui::InputScalar("Initial Y pos.", ImGuiDataType_S32, &y_origin, &Origin_incre);
+				ImGui::InputScalar("Initial Z pos.", ImGuiDataType_S32, &z_origin, &Origin_incre);
+
+				//enable and disable movement speed command in gcode
+				ImGui::Checkbox("Apply mv speed", &apply_mvspeed);
+				if (apply_mvspeed) ImGui::InputScalar("movement speed", ImGuiDataType_S32, &mv_speed, &S32_incre);
+
+				ImGui::TreePop();
+			}
+			*/
+
+			//Int to track how many coordinate values have changed
+			int coordinates_changed2 = 0;
+			int displacement_filter2 = 40;
+			int sample_threshold2 = 2;
+			
+
+			
+		
+			//Only record displacement if:
+			//----displacement is less than DISPLACEMENT_FILTER units long
+			//----new displacement has a delta of atleast SAMPLE_THRESHOLD from the previous displacement value
+
+
+			//NOTES: only record displacement if port 1 is not opened
+			// if it is opened, use the previously collected displacement from port 1
+			// to determine if we should record displacement and write to robot arm 2
+
+			if (!port_opened) {
+				if ((displacement.x < displacement_filter2 && displacement.x > -displacement_filter2) &&
+					((displacement.x >= x_temp_old + sample_threshold2) || (displacement.x <= x_temp_old - sample_threshold2))) {
+					x_temp_old = displacement_mult * displacement.x;
+					coordinates_changed2++;
+				}
+
+				if ((displacement.y < displacement_filter2 && displacement.y > -displacement_filter2) &&
+					((displacement.y >= y_temp_old + sample_threshold2) || (displacement.y <= y_temp_old - sample_threshold2))) {
+					y_temp_old = displacement_mult * displacement.y;
+					coordinates_changed2++;
+				}
+
+				if ((displacement.z < displacement_filter2 && displacement.z > -displacement_filter2) &&
+					((displacement.z >= z_temp_old + sample_threshold2) || (displacement.z <= z_temp_old - sample_threshold2))) {
+					z_temp_old = displacement_mult * displacement.z;
+					coordinates_changed2++;
+				}
+			}
+			else {
+				//coordinates_changed2 = coordinates_changed;
+			}
+
+			//NOTES: added "2" to all previously used variables for port 1 so that port 2 has independent 
+			// variables
+
+			//Adding displacement to current home position (multiplying displacement with a constant)
+			int x_dest2 = (x_temp_old * 4) + x_origin;
+			int y_dest2 = (y_temp_old * 2) + y_origin;
+			int z_dest2 = (z_temp_old * 2) + z_origin;
+
+			//--------Coordinate edge cases-----
+			//minimum and maximum X coordinates
+			if (x_dest2 > 300) x_dest2 = 300;
+			if (x_dest2 < -300) x_dest2 = -300;
+			//minimum and maximum Y coordinates
+			if (y_dest2 < 250) y_dest2 = 320;
+			if (y_dest2 > 500) y_dest2 = 500;
+			//minimum and maximum Z coordinates
+			if (z_dest2 < 100) z_dest2 = 100;
+			if (z_dest2 > 320) z_dest2 = 320;
+
+			//Apply base speed
+			if (apply_mvspeed) sprintf(gcode_buff2, "G1X%dY%dZ%dF%d", x_dest2, y_dest2, z_dest2, mv_speed);
+			else  sprintf(gcode_buff2, "G1X%dY%dZ%d", x_dest2, y_dest2, z_dest2);
+
+
+			//NOTE: independent loop tracker for port 2
+
+			//send to robot over serial port if more than 1 coordinate has been updated
+			//after sending set a timer
+			if (coordinates_changed2 >= 1 && loops_since_send2 == 0) {
+				s2.write(gcode_buff);
+				loops_since_send2 = 10;
+			}
+
+			//decriment timer till next viable gcode send
+			if (loops_since_send2 > 0) loops_since_send2 -= 1;
+			else loops_since_send2 = 0;
+
+		
+
+			ImGui::Text(gcode_buff2);
+			memset(gcode_buff2, 0, sizeof(gcode_buff2));
+
+			if (ImGui::Button("Stop gcode stream")) send_gcode2 = false;
+		}
+		else {
+
+			//If not streaming gcode , allow user to send discreet gcode commands
+			//Note:
+			//Each serial message will be sent after appending both NL and CR character at the end of the gcode command string
+			static char writebuff2[32] = "";
+			ImGui::InputText("gcode command", writebuff2, 32, ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsNoBlank);
+			ImGui::SameLine();
+
+			if (ImGui::Button("send")) {
+				s2.write(writebuff2);
+				memset(writebuff2, 0, sizeof(writebuff2));
+			}
+
+			//Some discreet robot commands in a hidable tree
+			if (ImGui::TreeNode("GCODE commands for port 2")) {
+				if (ImGui::Button("Enable Steppers")) s2.write("M17");
+				ImGui::SameLine();
+				if (ImGui::Button("Disable Steppers")) s2.write("M18");
+				ImGui::TreePop();
+			}
+
+
+			if (ImGui::Button("Start gcode stream")) send_gcode2 = true;
+
+			if (ImGui::Button("Close port2 connection")) { //If port already opened give show button to close
+				s2.close();								//close port
+				port_opened2 = false;					//reset flag to allow reconnection
+			}
+
+		}
+
+
+
+	}
 
 	
+	//---------------------------END OF ROBOT ARM CONNECTED TO COM PORT 2-----------------------------
+
+
+
+
 	
 
 	ImGui::End();
@@ -909,9 +1099,13 @@ void KinectXRobotApp::cleanup() {
 		OutputDebugStringA("Kinect cleaned up\n");
 	}
 
-	//Close port if opened
+	//Close port1 if opened
 	if (port_opened == true)
 		s1.close();
+
+	//Close port2 if opened
+	if (port_opened2 == true)
+		s2.close();
 }
 
 

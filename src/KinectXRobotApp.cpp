@@ -1160,7 +1160,7 @@ void KinectXRobotApp::draw_skeleton() {
 		
 	}
 
-	//--Drawing displacement vector for first tracking target
+	//--Drawing displacement vector for second tracking target
 	//draw vector from faux_origin to tracked target (temporarily left hand) if faux origin has been set
 	if (faux_origin2_set) {
 		//get trackig target

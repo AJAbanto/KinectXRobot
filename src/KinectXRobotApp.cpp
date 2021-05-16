@@ -80,11 +80,16 @@ class KinectXRobotApp : public App {
 	const int S32_incre = 50.0f;
 	const int Origin_incre = 1.0f;
 	
-	int x_temp, y_temp, z_temp;				//Motion capturefiltering tools
+	int x_temp, y_temp, z_temp;					//Motion capturefiltering tools for target 1
 	int x_temp_old, y_temp_old, z_temp_old;
-	float tot_displacement, old_tot_displacement;
+
+	int x_temp2, y_temp2, z_temp2;				//Motion capturefiltering tools for target 2
+	int x_temp2_old, y_temp2_old, z_temp2_old;
+
 	int x_origin, y_origin, z_origin;		//Initial position of robot
+
 	int mv_speed;			//speed up tool
+
 	char gcode_buff[32];	//gcode container before streaming for port 1
 	char gcode_buff2[32];	//gcode container before streaming for port 2
 	bool apply_mvspeed;		//speed testing
@@ -106,9 +111,19 @@ class KinectXRobotApp : public App {
 	vec3 faux_origin;
 	bool faux_origin_set;
 
+	//Faux origin for second tracking target
+	vec3 faux_origin2;
+	bool faux_origin2_set;
+
+
 	int tracking_target;		//int for choosing which target to track for displacement
+	int tracking_target2;		//int for second tracking target
+
 	bool apply_displacement;	//flag for applying displacement
+	
 	vec3 displacement;			//displacement vector calculated relative to origin
+	vec3 displacement2;			//displacement vector for second tracking target
+
 	float displacement_mult;	//scalar multiplier to change sensitivity of displacement vector
 	
 
@@ -131,6 +146,9 @@ class KinectXRobotApp : public App {
 
 	//function to set faux origin;
 	void set_faux_origin();
+
+	//function to set second faux origin
+	void set_faux_origin2();
 
 	//function to draw lines as bones in 3D space
 	void draw3D_bone(NUI_SKELETON_DATA skeletonData,
@@ -171,7 +189,10 @@ void KinectXRobotApp::setup()
 	//initialize kinect tracking stuff
 	seated_tracking = true;
 	faux_origin_set = false;
+	faux_origin2_set = false;
+
 	tracking_target = 0;
+	tracking_target2 = 0;
 	apply_displacement = false;
 	displacement_mult = 1.0f;
 
@@ -206,8 +227,8 @@ void KinectXRobotApp::setup()
 	z_origin = 320;
 
 	//initialize filtering variables
-	tot_displacement = 0;
-	old_tot_displacement = 0;
+	
+	//--port1 filters
 	x_temp = 0;
 	y_temp = 0;
 	z_temp = 0;
@@ -215,6 +236,15 @@ void KinectXRobotApp::setup()
 	x_temp_old = x_temp;
 	y_temp_old = y_temp;
 	z_temp_old = z_temp;
+
+	//--port2 filters
+	x_temp2 = 0;
+	y_temp2 = 0;
+	z_temp2 = 0;
+
+	x_temp2_old = x_temp2;
+	y_temp2_old = y_temp2;
+	z_temp2_old = z_temp2;
 
 	apply_mvspeed = false;
 	mv_speed = 0;
@@ -379,8 +409,6 @@ void KinectXRobotApp::update()
 			int coordinates_changed = 0;
 			int displacement_filter = 40;
 			int sample_threshold = 2;
-			//get total length of displacement vector
-			tot_displacement = sqrt((displacement.x * displacement.x) + (displacement.y * displacement.y) + (displacement.z * displacement.z));
 			
 			//Only record displacement if:
 			//----displacement is less than DISPLACEMENT_FILTER units long
@@ -436,8 +464,7 @@ void KinectXRobotApp::update()
 			if (loops_since_send > 0) loops_since_send -= 1;
 			else loops_since_send = 0;
 
-			//update record
-			old_tot_displacement = tot_displacement;
+			
 			
 			ImGui::Text(gcode_buff);
 			memset(gcode_buff, 0, sizeof(gcode_buff));
@@ -538,48 +565,36 @@ void KinectXRobotApp::update()
 			int displacement_filter2 = 40;
 			int sample_threshold2 = 2;
 			
-
-			
 		
 			//Only record displacement if:
 			//----displacement is less than DISPLACEMENT_FILTER units long
 			//----new displacement has a delta of atleast SAMPLE_THRESHOLD from the previous displacement value
 
-
-			//NOTES: only record displacement if port 1 is not opened
-			// if it is opened, use the previously collected displacement from port 1
-			// to determine if we should record displacement and write to robot arm 2
-
-			if (!port_opened) {
-				if ((displacement.x < displacement_filter2 && displacement.x > -displacement_filter2) &&
-					((displacement.x >= x_temp_old + sample_threshold2) || (displacement.x <= x_temp_old - sample_threshold2))) {
-					x_temp_old = displacement_mult * displacement.x;
-					coordinates_changed2++;
-				}
-
-				if ((displacement.y < displacement_filter2 && displacement.y > -displacement_filter2) &&
-					((displacement.y >= y_temp_old + sample_threshold2) || (displacement.y <= y_temp_old - sample_threshold2))) {
-					y_temp_old = displacement_mult * displacement.y;
-					coordinates_changed2++;
-				}
-
-				if ((displacement.z < displacement_filter2 && displacement.z > -displacement_filter2) &&
-					((displacement.z >= z_temp_old + sample_threshold2) || (displacement.z <= z_temp_old - sample_threshold2))) {
-					z_temp_old = displacement_mult * displacement.z;
-					coordinates_changed2++;
-				}
+			if ((displacement2.x < displacement_filter2 && displacement2.x > -displacement_filter2) &&
+				((displacement2.x >= x_temp2_old + sample_threshold2) || (displacement2.x <= x_temp2_old - sample_threshold2))) {
+				x_temp2_old = displacement_mult * displacement2.x;
+				coordinates_changed2++;
 			}
-			else {
-				//coordinates_changed2 = coordinates_changed;
+
+			if ((displacement2.y < displacement_filter2 && displacement2.y > -displacement_filter2) &&
+				((displacement2.y >= y_temp2_old + sample_threshold2) || (displacement2.y <= y_temp_old - sample_threshold2))) {
+				y_temp2_old = displacement_mult * displacement2.y;
+				coordinates_changed2++;
+			}
+
+			if ((displacement2.z < displacement_filter2 && displacement2.z > -displacement_filter2) &&
+				((displacement2.z >= z_temp2_old + sample_threshold2) || (displacement2.z <= z_temp2_old - sample_threshold2))) {
+				z_temp2_old = displacement_mult * displacement2.z;
+				coordinates_changed2++;
 			}
 
 			//NOTES: added "2" to all previously used variables for port 1 so that port 2 has independent 
 			// variables
 
 			//Adding displacement to current home position (multiplying displacement with a constant)
-			int x_dest2 = (x_temp_old * 4) + x_origin;
-			int y_dest2 = (y_temp_old * 2) + y_origin;
-			int z_dest2 = (z_temp_old * 2) + z_origin;
+			int x_dest2 = (x_temp2_old * 4) + x_origin;
+			int y_dest2 = (y_temp2_old * 2) + y_origin;
+			int z_dest2 = (z_temp2_old * 2) + z_origin;
 
 			//--------Coordinate edge cases-----
 			//minimum and maximum X coordinates
@@ -657,8 +672,6 @@ void KinectXRobotApp::update()
 	//---------------------------END OF ROBOT ARM CONNECTED TO COM PORT 2-----------------------------
 
 
-
-
 	
 
 	ImGui::End();
@@ -699,30 +712,54 @@ void KinectXRobotApp::update()
 	tracking_targets.push_back("Left foot");
 	tracking_targets.push_back("Right foot");
 
-	//Displacement vector info
+	//Displacement vector 1 info
 	string displacement_str = "Displacement: (X" + std::to_string(displacement.x) + " ,Y " + std::to_string(displacement.y) + " ,Z "
 		+ std::to_string(displacement.z) + " )";
 
-	//Faux origin vector info
+	//Displacement vector 2 info
+	string displacement2_str = "Displacement 2: (X" + std::to_string(displacement2.x) + " ,Y " + std::to_string(displacement2.y) + " ,Z "
+		+ std::to_string(displacement2.z) + " )";
+
+	//Faux origin 1 vector info
 	string faux_origin_string = "Faux origin ( " + std::to_string(faux_origin.x) + ", "
 		+ std::to_string(faux_origin.y) + ", " + std::to_string(faux_origin.z) + ")";
 
+	//Faux origin 2 vector info
+	string faux_origin2_string = "Faux origin 2 ( " + std::to_string(faux_origin2.x) + ", "
+		+ std::to_string(faux_origin2.y) + ", " + std::to_string(faux_origin2.z) + ")";
+
 	//Kinect tracking control window
 	ImGui::Begin("Kinect output");
-	
-	ImGui::Combo("Tracking target", &tracking_target, tracking_targets);
 	ImGui::Checkbox("Seated Tracking", &seated_tracking);
+
+	//----------TRACKING TARGET FOR PORT 1---------------
+	ImGui::Combo("Tracking target", &tracking_target, tracking_targets);
+	
 
 	ImGui::Text(faux_origin_string.c_str());
 	if (ImGui::Button("Set new faux origin")) set_faux_origin();
 
 	ImGui::Text(displacement_str.c_str());
-	int dummy = 0;	//dummy vairable
-	ImGui::ListBox("Displacement queue", &dummy, gcode_string_vector, gcode_queue_len);	//view gcode queue
 	
 
 	ImGui::Spacing();
 	ImGui::Separator();
+
+
+	//----------TRACKING TARGET FOR PORT 2---------------
+	ImGui::Combo("Tracking target", &tracking_target2, tracking_targets);
+
+	ImGui::Text(faux_origin2_string.c_str());
+	if (ImGui::Button("Set new faux origin2")) set_faux_origin2();
+
+	ImGui::Text(displacement2_str.c_str());
+	
+
+	ImGui::Spacing();
+	ImGui::Separator();
+
+
+
 
 	//Camera controls for the skeleton renderer window
 	if (ImGui::TreeNode("Renderer camera controls")) {
@@ -925,6 +962,7 @@ void KinectXRobotApp::set_faux_origin()
 		Vector4 left_foot_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_FOOT_LEFT];
 		Vector4 right_foot_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_FOOT_RIGHT];
 
+		//First target for tracking
 		switch (tracking_target) {
 			case 0:
 				tracked_pos = head_pos;
@@ -945,11 +983,70 @@ void KinectXRobotApp::set_faux_origin()
 				tracked_pos = left_hand_pos;
 		}
 
+		
+
 		//set faux origin temporarily via hardcoding and scale to cm from raw m values
 		float scalar = 100.0f;
 		faux_origin = vec3(tracked_pos.x * scalar, tracked_pos.y * scalar, tracked_pos.z * scalar);
 
 		if (!faux_origin_set) faux_origin_set = true;
+
+		return;
+	}
+}
+
+
+
+void KinectXRobotApp::set_faux_origin2()
+{
+	//Idea: cycle through all skeleton data, might help stabalize tracking
+	//Transfer to proper variable
+	NUI_SKELETON_DATA skeletonData = c_skeletonFrame.SkeletonData[0];
+
+	for (int i = 0; skeletonData.eTrackingState == NUI_SKELETON_NOT_TRACKED; i++) {
+		if (i >= 6) return;
+		else skeletonData = c_skeletonFrame.SkeletonData[i];
+	}
+
+	if (skeletonData.eTrackingState != NUI_SKELETON_NOT_TRACKED) {
+
+		//assume that head is tracked so we get the data
+		Vector4 tracked_pos2 = Vector4();
+
+		Vector4 head_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_HEAD];
+		Vector4 left_hand_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_HAND_LEFT];
+		Vector4 right_hand_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_HAND_RIGHT];
+		Vector4 left_foot_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_FOOT_LEFT];
+		Vector4 right_foot_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_FOOT_RIGHT];
+
+		//First target for tracking
+		switch (tracking_target2) {
+		case 0:
+			tracked_pos2 = head_pos;
+			break;
+		case 1:
+			tracked_pos2 = left_hand_pos;
+			break;
+		case 2:
+			tracked_pos2 = right_hand_pos;
+			break;
+		case 3:
+			tracked_pos2 = left_foot_pos;
+			break;
+		case 4:
+			tracked_pos2 = right_foot_pos;
+			break;
+		default:
+			tracked_pos2 = left_hand_pos;
+		}
+
+
+
+		//set faux origin temporarily via hardcoding and scale to cm from raw m values
+		float scalar = 100.0f;
+		faux_origin2 = vec3(tracked_pos2.x * scalar, tracked_pos2.y * scalar, tracked_pos2.z * scalar);
+
+		if (!faux_origin2_set) faux_origin2_set = true;
 
 		return;
 	}
@@ -1008,17 +1105,23 @@ void KinectXRobotApp::draw_skeleton() {
 
 	}
 
+	//Extracting skeleton data to use for drawing displacement vectors
+	Vector4 head_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_HEAD];
+	Vector4 left_hand_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_HAND_LEFT];
+	Vector4 right_hand_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_HAND_RIGHT];
+	Vector4 left_foot_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_FOOT_LEFT];
+	Vector4 right_foot_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_FOOT_RIGHT];
+
+
+
+
+	//--Drawing displacement vector for first tracking target
 	//draw vector from faux_origin to tracked target (temporarily left hand) if faux origin has been set
 	if (faux_origin_set) {
 		//get trackig target
 
 		Vector4 tracked_pos = Vector4();
 
-		Vector4 head_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_HEAD];
-		Vector4 left_hand_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_HAND_LEFT];
-		Vector4 right_hand_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_HAND_RIGHT];
-		Vector4 left_foot_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_FOOT_LEFT];
-		Vector4 right_foot_pos = skeletonData.SkeletonPositions[NUI_SKELETON_POSITION_FOOT_RIGHT];
 
 		switch (tracking_target) {
 		case 0:
@@ -1056,7 +1159,52 @@ void KinectXRobotApp::draw_skeleton() {
 		}
 		
 	}
-	//Draw bones here
+
+	//--Drawing displacement vector for first tracking target
+	//draw vector from faux_origin to tracked target (temporarily left hand) if faux origin has been set
+	if (faux_origin2_set) {
+		//get trackig target
+
+		Vector4 tracked_pos2 = Vector4();
+
+		switch (tracking_target2) {
+		case 0:
+			tracked_pos2 = head_pos;
+			break;
+		case 1:
+			tracked_pos2 = left_hand_pos;
+			break;
+		case 2:
+			tracked_pos2 = right_hand_pos;
+			break;
+		case 3:
+			tracked_pos2 = left_foot_pos;
+			break;
+		case 4:
+			tracked_pos2 = right_foot_pos;
+			break;
+		default:
+			tracked_pos2 = left_hand_pos;
+		}
+
+		float scalar = 100.0f;	//convert from m to cm
+		vec3 target_pos2 = vec3(tracked_pos2.x * scalar, tracked_pos2.y * scalar, tracked_pos2.z * scalar);
+
+
+		//assume faux_origin2 has been set and scaled properly
+		gl::color(Color(0, 1, 0));
+		gl::lineWidth(8);
+		gl::drawLine(faux_origin2, target_pos2);
+		gl::color(Color(1, 1, 1));
+
+		//calculate and record displacement to be applied to robot
+		if (apply_displacement) {
+			displacement2 = target_pos2 - faux_origin2;
+		}
+
+	}
+
+	//PROCEED TO DRAW THE TRACKED SKELETON
 
 	//3D render mode
 	draw3D_bone(skeletonData, NUI_SKELETON_POSITION_HEAD, NUI_SKELETON_POSITION_SHOULDER_CENTER);

@@ -477,7 +477,7 @@ void KinectXRobotApp::update()
 			//Note:
 			//Each serial message will be sent after appending both NL and CR character at the end of the gcode command string
 			static char writebuff[32] = "";
-			ImGui::InputText("gcode command", writebuff, 32, ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsNoBlank );
+			ImGui::InputText("gcode command", writebuff, 32, ImGuiInputTextFlags_CharsUppercase );
 			ImGui::SameLine();
 			
 			if (ImGui::Button("send")) {
@@ -617,7 +617,7 @@ void KinectXRobotApp::update()
 			//send to robot over serial port if more than 1 coordinate has been updated
 			//after sending set a timer
 			if (coordinates_changed2 >= 1 && loops_since_send2 == 0) {
-				s2.write(gcode_buff);
+				s2.write(gcode_buff2);
 				loops_since_send2 = 10;
 			}
 
@@ -638,7 +638,7 @@ void KinectXRobotApp::update()
 			//Note:
 			//Each serial message will be sent after appending both NL and CR character at the end of the gcode command string
 			static char writebuff2[32] = "";
-			ImGui::InputText("gcode command", writebuff2, 32, ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsNoBlank);
+			ImGui::InputText("gcode command 2", writebuff2, 32, ImGuiInputTextFlags_CharsUppercase );
 			ImGui::SameLine();
 
 			if (ImGui::Button("send")) {
@@ -747,7 +747,7 @@ void KinectXRobotApp::update()
 
 
 	//----------TRACKING TARGET FOR PORT 2---------------
-	ImGui::Combo("Tracking target", &tracking_target2, tracking_targets);
+	ImGui::Combo("Tracking target 2", &tracking_target2, tracking_targets);
 
 	ImGui::Text(faux_origin2_string.c_str());
 	if (ImGui::Button("Set new faux origin2")) set_faux_origin2();

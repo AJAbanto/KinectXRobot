@@ -450,8 +450,8 @@ void KinectXRobotApp::update()
 			if (z_dest > 320) z_dest = 320;
 
 			//Apply base speed
-			if (apply_mvspeed) sprintf(gcode_buff, "G1X%dY%dZ%dF%d", x_dest, y_dest, z_dest, mv_speed);
-			else  sprintf(gcode_buff, "G1X%dY%dZ%d", x_dest, y_dest, z_dest);
+			if (apply_mvspeed) sprintf(gcode_buff, "G1X%dY%dZ%dF%d", x_dest, z_dest, y_dest, mv_speed);
+			else  sprintf(gcode_buff, "G1X%dY%dZ%d", x_dest, z_dest, y_dest ); //NOTE: flip Z and Y since kinect interprets Z as "Depth" instead of "height"
 
 			//send to robot over serial port if more than 1 coordinate has been updated
 			//after sending set a timer
@@ -608,8 +608,10 @@ void KinectXRobotApp::update()
 			if (z_dest2 > 320) z_dest2 = 320;
 
 			//Apply base speed
-			if (apply_mvspeed) sprintf(gcode_buff2, "G1X%dY%dZ%dF%d", x_dest2, y_dest2, z_dest2, mv_speed);
-			else  sprintf(gcode_buff2, "G1X%dY%dZ%d", x_dest2, y_dest2, z_dest2);
+			//NOTE: Z and Y have been flipped since Z is "Depth" for the kinect and Y is "height"
+			//Whilst it is the converse for the Robots
+			if (apply_mvspeed) sprintf(gcode_buff2, "G1X%dY%dZ%dF%d", x_dest2, z_dest2, y_dest2, mv_speed);
+			else  sprintf(gcode_buff2, "G1X%dY%dZ%d", x_dest2,  z_dest2, y_dest2);
 
 
 			//NOTE: independent loop tracker for port 2
@@ -618,6 +620,7 @@ void KinectXRobotApp::update()
 			//after sending set a timer
 			if (coordinates_changed2 >= 1 && loops_since_send2 == 0) {
 				s2.write(gcode_buff2);
+				//ImGui::Text("SENT");
 				loops_since_send2 = 10;
 			}
 
